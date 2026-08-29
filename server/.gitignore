@@ -1,0 +1,11 @@
+# Server Environment File (Contains DB passwords & JWT Secrets)
+.env
+.env.*
+!.env.example
+
+# Node Modules
+node_modules/
+
+# Logs
+logs/
+*.log

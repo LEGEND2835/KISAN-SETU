@@ -1,0 +1,22 @@
+{
+  "name": "sih-2026-kisansetu",
+  "version": "1.0.0",
+  "description": "SIH 2026 Agricultural Procurement Slot & Queue Management Platform",
+  "scripts": {
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm run dev",
+    "start": "node server/src/server.js",
+    "build": "cd client && npm run build"
+  },
+  "keywords": [
+    "sih2026",
+    "smart-india-hackathon",
+    "agriculture",
+    "procurement",
+    "queue-management",
+    "mandi",
+    "slot-booking"
+  ],
+  "author": "SIH 2026 Team",
+  "license": "MIT"
+}
