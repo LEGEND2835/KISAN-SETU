@@ -5,6 +5,45 @@ import { broadcastQueueUpdate } from '../sockets/queueSocket.js';
 
 const router = express.Router();
 
+export function isSlotPassed(slotDate, endTime) {
+  if (!slotDate || !endTime) return false;
+
+  let slotDateStr = '';
+  if (typeof slotDate === 'string') {
+    slotDateStr = slotDate.split('T')[0];
+  } else if (slotDate instanceof Date) {
+    const y = slotDate.getFullYear();
+    const m = String(slotDate.getMonth() + 1).padStart(2, '0');
+    const d = String(slotDate.getDate()).padStart(2, '0');
+    slotDateStr = `${y}-${m}-${d}`;
+  } else {
+    slotDateStr = String(slotDate).slice(0, 10);
+  }
+
+  const now = new Date();
+  const nowYear = now.getFullYear();
+  const nowMonth = String(now.getMonth() + 1).padStart(2, '0');
+  const nowDate = String(now.getDate()).padStart(2, '0');
+  const nowDateStr = `${nowYear}-${nowMonth}-${nowDate}`;
+
+  if (slotDateStr < nowDateStr) {
+    return true;
+  }
+  if (slotDateStr > nowDateStr) {
+    return false;
+  }
+
+  // Same date: Compare current time with slot endTime (e.g. '10:00' or '10:00:00')
+  const timeParts = String(endTime).split(':');
+  const endHour = parseInt(timeParts[0] || '0', 10);
+  const endMin = parseInt(timeParts[1] || '0', 10);
+  const slotEndTotalMins = endHour * 60 + endMin;
+
+  const currentTotalMins = now.getHours() * 60 + now.getMinutes();
+
+  return currentTotalMins >= slotEndTotalMins;
+}
+
 // GET /api/slots - Fetch available slots for a centre on a given date
 router.get('/', async (req, res) => {
   try {
@@ -79,7 +118,7 @@ router.get('/', async (req, res) => {
       }
     }
 
-    // Add availability metrics
+    // Add availability metrics and past slot verification
     const enhancedSlots = slots.map(s => {
       const bookedTokens = parseInt(s.booked_tokens || '0', 10);
       const maxTokens = parseInt(s.max_tokens || '25', 10);
@@ -89,14 +128,16 @@ router.get('/', async (req, res) => {
       const remainingTokens = maxTokens - bookedTokens;
       const remainingCapacity = maxCap - bookedCap;
       const occupancyPercentage = Math.round((bookedTokens / maxTokens) * 100);
+      const isPast = isSlotPassed(s.slot_date, s.end_time);
 
       return {
         ...s,
+        is_past: isPast,
         remaining_tokens: Math.max(0, remainingTokens),
         remaining_capacity_quintals: Math.max(0, remainingCapacity),
         occupancy_percentage: occupancyPercentage,
-        congestion_color: occupancyPercentage >= 80 ? 'RED' : occupancyPercentage >= 40 ? 'YELLOW' : 'GREEN',
-        is_bookable: remainingTokens > 0 && s.status === 'OPEN',
+        congestion_color: isPast ? 'GRAY' : occupancyPercentage >= 80 ? 'RED' : occupancyPercentage >= 40 ? 'YELLOW' : 'GREEN',
+        is_bookable: !isPast && remainingTokens > 0 && s.status === 'OPEN',
       };
     });
 
@@ -165,6 +206,13 @@ router.post('/book', authenticateToken, async (req, res) => {
         return res.status(404).json({ success: false, message: 'Selected slot does not exist.' });
       }
       centre = inMemoryStore.centres.find(c => c.id === centre_id);
+    }
+
+    if (isSlotPassed(slot.slot_date, slot.end_time)) {
+      return res.status(400).json({
+        success: false,
+        message: 'This time slot has already passed for today. Please select an upcoming slot or future date.',
+      });
     }
 
     if (parseInt(slot.booked_tokens, 10) >= parseInt(slot.max_tokens, 10)) {

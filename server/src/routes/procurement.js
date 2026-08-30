@@ -1,7 +1,7 @@
 import express from 'express';
 import { inMemoryStore, isUsingMockStore, pool } from '../db/index.js';
 import { broadcastQueueUpdate } from '../sockets/queueSocket.js';
-import { authenticateToken } from '../middleware/auth.js';
+import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -20,7 +20,11 @@ const MSP_RATES = {
 };
 
 // 1. Submit Quality Inspection Results
-router.post('/quality-check', async (req, res) => {
+router.post(
+  '/quality-check',
+  authenticateToken,
+  authorizeRoles('quality_inspector', 'centre_officer', 'admin'),
+  async (req, res) => {
   try {
     const {
       booking_id,
@@ -145,7 +149,11 @@ router.post('/quality-check', async (req, res) => {
 });
 
 // 2. Submit Weighbridge Gross or Tare Weight
-router.post('/weighbridge', async (req, res) => {
+router.post(
+  '/weighbridge',
+  authenticateToken,
+  authorizeRoles('weighbridge_operator', 'centre_officer', 'admin'),
+  async (req, res) => {
   try {
     const { booking_id, operator_id, gross_weight_kg, tare_weight_kg } = req.body;
 

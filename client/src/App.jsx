@@ -6,6 +6,7 @@ import { LanguageProvider } from './context/LanguageContext';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import AiVoiceModal from './components/ai/AiVoiceModal';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 
 import Home from './pages/Home';
 import BookSlot from './pages/farmer/BookSlot';
@@ -30,10 +31,31 @@ function AppLayout() {
       <main className="flex-1">
         <Routes>
           <Route path="/" element={<Home onOpenAiModal={() => setAiModalOpen(true)} />} />
-          <Route path="/book-slot" element={<BookSlot />} />
+          <Route
+            path="/book-slot"
+            element={
+              <ProtectedRoute allowedRoles={['farmer', 'admin']}>
+                <BookSlot />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/token/:id" element={<TokenPass />} />
-          <Route path="/my-bookings" element={<MyBookings />} />
-          <Route path="/centre/officer" element={<OfficerDashboard />} />
+          <Route
+            path="/my-bookings"
+            element={
+              <ProtectedRoute allowedRoles={['farmer', 'admin']}>
+                <MyBookings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/centre/officer"
+            element={
+              <ProtectedRoute allowedRoles={['centre_officer', 'quality_inspector', 'weighbridge_operator', 'admin']}>
+                <OfficerDashboard />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/display/:centreId" element={<PublicMandiDisplay />} />
           <Route path="/login" element={<Login />} />
           <Route path="/analytics" element={<MandiAnalytics />} />

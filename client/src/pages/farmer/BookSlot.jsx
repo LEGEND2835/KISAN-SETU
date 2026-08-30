@@ -65,7 +65,10 @@ export default function BookSlot() {
   // Step 3: Slot Date & Time
   const [slotDate, setSlotDate] = useState(() => {
     const d = new Date();
-    return d.toISOString().split('T')[0];
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   });
   const [availableSlots, setAvailableSlots] = useState([]);
   const [selectedSlotId, setSelectedSlotId] = useState('');
@@ -123,8 +126,10 @@ export default function BookSlot() {
           if (res.data.success) {
             setAvailableSlots(res.data.slots);
             if (res.data.slots.length > 0) {
-              const firstOpen = res.data.slots.find(s => s.is_bookable) || res.data.slots[0];
-              setSelectedSlotId(firstOpen.id);
+              const firstOpen = res.data.slots.find(s => s.is_bookable);
+              setSelectedSlotId(firstOpen ? firstOpen.id : '');
+            } else {
+              setSelectedSlotId('');
             }
           }
         } catch (err) {
@@ -512,7 +517,10 @@ export default function BookSlot() {
               {[0, 1, 2, 3].map((daysAhead) => {
                 const d = new Date();
                 d.setDate(d.getDate() + daysAhead);
-                const dStr = d.toISOString().split('T')[0];
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                const dStr = `${y}-${m}-${day}`;
                 const dayName = daysAhead === 0 ? 'Today' : daysAhead === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { weekday: 'short' });
                 const dateNum = d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
 
@@ -551,6 +559,7 @@ export default function BookSlot() {
                 {availableSlots.map((s) => {
                   const isSelected = selectedSlotId === s.id;
                   const isFull = !s.is_bookable;
+                  const isPast = s.is_past;
 
                   return (
                     <button
@@ -572,17 +581,20 @@ export default function BookSlot() {
                           {s.start_time} - {s.end_time}
                         </span>
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          isPast ? 'bg-slate-800 text-slate-400 border border-slate-700' :
                           s.congestion_color === 'GREEN' ? 'bg-emerald-500/20 text-emerald-300' :
                           s.congestion_color === 'YELLOW' ? 'bg-amber-500/20 text-amber-300' :
                           'bg-rose-500/20 text-rose-300'
                         }`}>
-                          {s.occupancy_percentage}% Full
+                          {isPast ? 'Slot Ended' : `${s.occupancy_percentage}% Full`}
                         </span>
                       </div>
 
                       <div className="text-[11px] text-slate-400 mt-2 flex justify-between">
-                        <span>Available Tokens:</span>
-                        <span className="font-semibold text-white">{s.remaining_tokens} / {s.max_tokens}</span>
+                        <span>{isPast ? 'Status:' : 'Available Tokens:'}</span>
+                        <span className="font-semibold text-white">
+                          {isPast ? 'Unavailable' : `${s.remaining_tokens} / ${s.max_tokens}`}
+                        </span>
                       </div>
                     </button>
                   );
