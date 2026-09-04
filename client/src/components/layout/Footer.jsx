@@ -6,14 +6,18 @@ export default function Footer() {
   const { t } = useLanguage();
 
   return (
-    <footer className="mt-20 border-t border-slate-800/80 bg-slate-950/60 text-slate-400 text-xs py-10">
+    <footer className="mt-20 border-t border-slate-800/80 bg-slate-950/60 text-slate-400 text-xs py-10 no-print">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-kisan-600 flex items-center justify-center">
-                <Tractor className="w-4 h-4 text-white" />
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full overflow-hidden bg-white ring-2 ring-kisan-500/40 flex items-center justify-center p-0.5">
+                <img 
+                  src="/logo.png" 
+                  alt="KisanSetu Logo" 
+                  className="w-full h-full object-cover rounded-full"
+                />
               </div>
               <span className="text-base font-bold text-white tracking-tight">{t('brand_title')}</span>
             </div>

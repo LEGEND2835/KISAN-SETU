@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Tractor, ShieldCheck, Sparkles, User, Lock, Phone, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { useAuth, DEMO_PROFILES } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { INDIAN_STATES, getDistrictsForState } from '../../utils/indianStatesAndDistricts';
 
 export default function Login() {
   const { login, registerFarmer, quickSwitchProfile } = useAuth();
@@ -19,6 +20,16 @@ export default function Login() {
   const [state, setState] = useState('Haryana');
   const [district, setDistrict] = useState('Karnal');
   const [village, setVillage] = useState('Taraori');
+
+  const handleStateChange = (newState) => {
+    setState(newState);
+    const dList = getDistrictsForState(newState);
+    if (dList.length > 0) {
+      setDistrict(dList[0]);
+    }
+  };
+
+  const availableDistricts = getDistrictsForState(state);
 
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
@@ -40,14 +51,22 @@ export default function Login() {
           role,
         });
         if (res.user?.role === 'farmer') navigate('/my-bookings');
+        else if (res.user?.role === 'admin') navigate('/admin');
         else navigate('/centre/officer');
       } else {
         const res = await login(phone, password);
         if (res.user?.role === 'farmer') navigate('/my-bookings');
+        else if (res.user?.role === 'admin') navigate('/admin');
         else navigate('/centre/officer');
       }
     } catch (err) {
-      setErrorMsg(err.message || 'Authentication failed.');
+      const serverCode = err.response?.data?.code;
+      const serverMsg = err.response?.data?.message;
+      if (serverCode === 'PHONE_ALREADY_EXISTS' || (serverMsg && serverMsg.toLowerCase().includes('already exists'))) {
+        setErrorMsg('Phone number already exists. Please use a different number.');
+      } else {
+        setErrorMsg(serverMsg || 'Authentication failed. Please check your details.');
+      }
     } finally {
       setLoading(false);
     }
@@ -57,9 +76,13 @@ export default function Login() {
     <div className="max-w-md mx-auto px-4 py-12 space-y-6 animate-fade-in">
       
       {/* Brand Header */}
-      <div className="text-center space-y-2">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-kisan-500 to-kisan-700 flex items-center justify-center text-white mx-auto shadow-lg shadow-kisan-600/30">
-          <Tractor className="w-7 h-7" />
+      <div className="text-center space-y-3">
+        <div className="w-16 h-16 rounded-full overflow-hidden bg-white mx-auto shadow-xl shadow-kisan-600/30 ring-4 ring-kisan-500/40 p-1">
+          <img 
+            src="/logo.png" 
+            alt="KisanSetu Logo" 
+            className="w-full h-full object-cover rounded-full"
+          />
         </div>
         <h1 className="text-2xl font-black text-white tracking-tight">
           {isRegister ? 'Register Account' : 'Login to KisanSetu'}
@@ -88,6 +111,7 @@ export default function Login() {
               onClick={async () => {
                 await quickSwitchProfile(key);
                 if (profile.role === 'farmer') navigate('/my-bookings');
+                else if (profile.role === 'admin') navigate('/admin');
                 else navigate('/centre/officer');
               }}
               className="p-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-800 border border-slate-800 text-left transition-colors flex flex-col justify-between"
@@ -170,23 +194,29 @@ export default function Login() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-300 mb-1">State</label>
-                  <input
-                    type="text"
+                  <select
                     value={state}
-                    onChange={(e) => setState(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none"
+                    onChange={(e) => handleStateChange(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-kisan-500"
                     required
-                  />
+                  >
+                    {INDIAN_STATES.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-300 mb-1">District</label>
-                  <input
-                    type="text"
+                  <select
                     value={district}
                     onChange={(e) => setDistrict(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-kisan-500"
                     required
-                  />
+                  >
+                    {availableDistricts.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </>

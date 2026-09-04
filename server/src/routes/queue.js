@@ -12,6 +12,8 @@ function formatBooking(b) {
     farmer_name: b.farmer_name || 'Registered Farmer',
     farmer_phone: b.farmer_phone || '',
     slot_time: b.start_time ? `${b.start_time} - ${b.end_time}` : '',
+    rejection_stage: b.rejection_stage || null,
+    rejection_reason: b.rejection_reason || null,
     quality_check: b.quality_check || null,
     weighbridge_log: b.weighbridge_log || null,
     payment_info: b.payment_info || null,
@@ -64,6 +66,8 @@ router.get('/:centreId/live', async (req, res) => {
           farmer_name: farmer ? farmer.full_name : 'Registered Farmer',
           farmer_phone: farmer ? farmer.phone : '',
           slot_time: slot ? `${slot.start_time} - ${slot.end_time}` : '',
+          rejection_stage: b.rejection_stage || null,
+          rejection_reason: b.rejection_reason || null,
           quality_check: quality || null,
           weighbridge_log: weighbridge || null,
           payment_info: payment || null,
@@ -77,6 +81,7 @@ router.get('/:centreId/live', async (req, res) => {
     const weighing = enriched.filter(b => b.status === 'WEIGHING');
     const unloading = enriched.filter(b => b.status === 'UNLOADING');
     const completed = enriched.filter(b => b.status === 'PROCURED');
+    const rejected = enriched.filter(b => b.status === 'REJECTED');
     const bookedUpcoming = enriched.filter(b => b.status === 'BOOKED');
 
     return res.json({
@@ -86,6 +91,7 @@ router.get('/:centreId/live', async (req, res) => {
         total_today: enriched.length,
         in_progress_count: waitingAtGate.length + calledToGate.length + qualityInspection.length + weighing.length + unloading.length,
         completed_count: completed.length,
+        rejected_count: rejected.length,
         upcoming_count: bookedUpcoming.length,
         estimated_avg_wait_mins: waitingAtGate.length * 12 + 10,
       },
@@ -96,7 +102,8 @@ router.get('/:centreId/live', async (req, res) => {
         quality_inspection: qualityInspection,
         weighing: weighing,
         unloading: unloading,
-        completed: completed.slice(-10).reverse(),
+        completed: completed.slice(-15).reverse(),
+        rejected: rejected.slice(-15).reverse(),
       },
     });
   } catch (error) {
@@ -122,11 +129,24 @@ router.post(
       let booking = null;
 
       if (!isUsingMockStore && pool) {
-        const bRes = await pool.query(
-          `SELECT * FROM bookings 
-           WHERE (token_number = $1 OR qr_code_hash LIKE $2) AND centre_id = $3`,
-          [token_number || '', `%${qr_hash || ''}%`, centreId]
-        );
+        let bRes;
+        if (token_number && qr_hash) {
+          bRes = await pool.query(
+            `SELECT * FROM bookings WHERE (token_number = $1 OR id = $1 OR qr_code_hash LIKE $2) AND centre_id = $3`,
+            [token_number, `%${qr_hash}%`, centreId]
+          );
+        } else if (token_number) {
+          bRes = await pool.query(
+            `SELECT * FROM bookings WHERE (token_number = $1 OR id = $1) AND centre_id = $2`,
+            [token_number, centreId]
+          );
+        } else {
+          bRes = await pool.query(
+            `SELECT * FROM bookings WHERE qr_code_hash LIKE $1 AND centre_id = $2`,
+            [`%${qr_hash}%`, centreId]
+          );
+        }
+
         if (bRes.rows.length === 0) {
           return res.status(404).json({ success: false, message: 'No matching booking found for this centre.' });
         }
@@ -157,7 +177,8 @@ router.post(
         booking.current_station = 'WAITING_AREA';
       } else {
         booking = inMemoryStore.bookings.find(
-          b => (b.token_number === token_number || (qr_hash && b.qr_code_hash.includes(qr_hash))) &&
+          b => ((token_number && (b.token_number === token_number || b.id === token_number)) || 
+                (qr_hash && b.qr_code_hash.includes(qr_hash))) &&
                b.centre_id === centreId
         );
         if (!booking) {
@@ -227,23 +248,27 @@ router.post(
           return res.status(404).json({ success: false, message: 'No vehicle available in waiting queue to call.' });
         }
 
-        const calledStation = station_name || `DESK_${desk_number || '1'}`;
+        const targetStatus = req.body.target_status || 
+          (station_name?.toLowerCase().includes('quality') || station_name?.toLowerCase().includes('lab') 
+            ? 'QUALITY_INSPECTION' 
+            : 'CALLED');
+        const calledStation = station_name || (targetStatus === 'QUALITY_INSPECTION' ? 'QUALITY_LAB' : `DESK_${desk_number || '1'}`);
         const calledTime = new Date().toISOString();
 
         await pool.query(
           `UPDATE bookings 
-           SET status = 'CALLED', current_station = $1, called_time = $2 
-           WHERE id = $3`,
-          [calledStation, calledTime, booking.id]
+           SET status = $1, current_station = $2, called_time = $3 
+           WHERE id = $4`,
+          [targetStatus, calledStation, calledTime, booking.id]
         );
 
         await pool.query(
           `INSERT INTO queue_audit_logs (id, booking_id, from_status, to_status, station, timestamp)
-           VALUES ($1, $2, $3, 'CALLED', $4, $5)`,
-          [`log_${Date.now()}`, booking.id, booking.status, calledStation, calledTime]
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [`log_${Date.now()}`, booking.id, booking.status, targetStatus, calledStation, calledTime]
         );
 
-        booking.status = 'CALLED';
+        booking.status = targetStatus;
         booking.current_station = calledStation;
       } else {
         if (token_id) {
@@ -256,8 +281,14 @@ router.post(
           return res.status(404).json({ success: false, message: 'No vehicle available in waiting queue to call.' });
         }
 
-        booking.status = 'CALLED';
-        booking.current_station = station_name || `DESK_${desk_number || '1'}`;
+        const targetStatus = req.body.target_status || 
+          (station_name?.toLowerCase().includes('quality') || station_name?.toLowerCase().includes('lab') 
+            ? 'QUALITY_INSPECTION' 
+            : 'CALLED');
+        const calledStation = station_name || (targetStatus === 'QUALITY_INSPECTION' ? 'QUALITY_LAB' : `DESK_${desk_number || '1'}`);
+
+        booking.status = targetStatus;
+        booking.current_station = calledStation;
         booking.called_time = new Date().toISOString();
       }
 

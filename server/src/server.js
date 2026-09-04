@@ -15,6 +15,7 @@ import slotsRoutes from './routes/slots.js';
 import queueRoutes from './routes/queue.js';
 import procurementRoutes from './routes/procurement.js';
 import aiRoutes from './routes/ai.js';
+import adminRoutes from './routes/admin.js';
 
 dotenv.config();
 
@@ -58,6 +59,7 @@ app.use('/api/bookings', slotsRoutes); // Alias for booking endpoints
 app.use('/api/queue', queueRoutes);
 app.use('/api/procurement', procurementRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Root fallback
 app.get('/', (req, res) => {

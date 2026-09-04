@@ -80,3 +80,89 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 116, 139, 0.8);
 }
+
+/* ==========================================================================
+   Print Optimization & Strict Document Isolation
+   ========================================================================== */
+@media print {
+  /* Hide all interactive navigation, footer, AI floating widgets, and marked UI elements */
+  nav,
+  footer,
+  .no-print,
+  [data-no-print="true"],
+  #ai-voice-modal,
+  .badge-status {
+    display: none !important;
+  }
+
+  /* Reset body and background to pure white for crisp paper printing */
+  html,
+  body {
+    background: #ffffff !important;
+    background-image: none !important;
+    color: #0f172a !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 12pt !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm;
+  }
+
+  /* Root container styling on print */
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Printable pass card styling for paper */
+  .printable-pass-card {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: 2px solid #0f172a !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+    padding: 20px 24px !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Printable e-J-Form document styling for paper */
+  .printable-jform-modal-overlay {
+    position: static !important;
+    inset: auto !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+  }
+
+  .printable-jform-doc {
+    position: static !important;
+    inset: auto !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: 2px solid #059669 !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+    padding: 20px 24px !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}
+

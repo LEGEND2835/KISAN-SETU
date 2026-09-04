@@ -15,26 +15,27 @@ import {
   Truck,
   Layers,
   IndianRupee,
-  ChevronRight
+  ChevronRight,
+  Info
 } from 'lucide-react';
-import { centresAPI } from '../services/api';
+import { centresAPI, procurementAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
-
-const MSP_DATA = [
-  { crop: 'Wheat (गेहूं)', rate: '₹2,275', unit: 'per Qtl', change: '+₹150' },
-  { crop: 'Paddy Basmati (धान)', rate: '₹4,200', unit: 'per Qtl', change: '+₹220' },
-  { crop: 'Mustard (सरसों)', rate: '₹5,650', unit: 'per Qtl', change: '+₹300' },
-  { crop: 'Gram (चना)', rate: '₹5,440', unit: 'per Qtl', change: '+₹105' },
-  { crop: 'Maize (मक्का)', rate: '₹2,090', unit: 'per Qtl', change: '+₹90' },
-  { crop: 'Soybean (सोयाबीन)', rate: '₹4,600', unit: 'per Qtl', change: '+₹140' },
-];
+import { CROPS_CATALOG, getCropName } from '../utils/cropsData';
+import MarketPriceTrends from '../components/MarketPriceTrends';
 
 export default function Home({ onOpenAiModal }) {
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
   const navigate = useNavigate();
   const [tokenSearchInput, setTokenSearchInput] = useState('');
   const [centres, setCentres] = useState([]);
   const [loadingCentres, setLoadingCentres] = useState(true);
+
+  // Market Prices State
+  const [marketPrices, setMarketPrices] = useState([]);
+  const [marketPricesMeta, setMarketPricesMeta] = useState({
+    source: 'FCI & State APMC Mandi Market Feeds',
+    last_updated: new Date().toISOString()
+  });
 
   useEffect(() => {
     async function loadCentres() {
@@ -49,7 +50,33 @@ export default function Home({ onOpenAiModal }) {
         setLoadingCentres(false);
       }
     }
+
+    async function loadPrices() {
+      try {
+        const res = await procurementAPI.getMarketPrices();
+        if (res.data.success && res.data.prices) {
+          setMarketPrices(res.data.prices);
+          if (res.data.meta) {
+            setMarketPricesMeta(res.data.meta);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load market prices, using fallback catalog:', err);
+        setMarketPrices(CROPS_CATALOG.map(c => ({
+          crop_key: c.key,
+          icon: c.icon,
+          msp_rate: c.msp,
+          market_rate: c.marketPrice,
+          unit: 'Qtl',
+          change: '+₹150',
+          source_mandi: 'Karnal Grain Hub',
+          last_updated: new Date().toISOString()
+        })));
+      }
+    }
+
     loadCentres();
+    loadPrices();
   }, []);
 
   const handleTrackToken = (e) => {
@@ -59,37 +86,77 @@ export default function Home({ onOpenAiModal }) {
     }
   };
 
+  const formattedLastUpdated = marketPricesMeta.last_updated
+    ? new Date(marketPricesMeta.last_updated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : 'Live';
+
   return (
     <div className="space-y-16 py-6 sm:py-10">
       
-      {/* 1. Live MSP Ticker */}
+      {/* 1. Official MSP & Current Mandi Market Rates Ticker */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-xl overflow-hidden">
-          <div className="flex items-center gap-3 mb-2 px-1">
-            <span className="flex h-2.5 w-2.5 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-            </span>
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-              <IndianRupee className="w-3.5 h-3.5" />
-              {t('live_msp_rates')}
-            </span>
-            <span className="text-[11px] text-slate-500 hidden sm:inline">| Official FCI Procurement Floor Price</span>
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 sm:p-5 shadow-xl overflow-hidden space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-2.5 w-2.5 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+              </span>
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                <IndianRupee className="w-3.5 h-3.5" />
+                {t('live_msp_rates')}
+              </span>
+              <span className="text-[11px] text-slate-400 hidden md:inline">
+                | Guaranteed Floor Price & Mandi Benchmark
+              </span>
+            </div>
+
+            <div className="text-[11px] text-slate-400 flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
+                Source: {marketPricesMeta.source || 'State APMC Feeds'}
+              </span>
+              <span>Updated: <strong className="text-amber-400 font-mono">{formattedLastUpdated}</strong></span>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-            {MSP_DATA.map((item, idx) => (
-              <div
-                key={idx}
-                className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5 flex flex-col justify-between hover:border-kisan-500/40 transition-colors"
-              >
-                <span className="text-xs font-medium text-slate-300 truncate">{item.crop}</span>
-                <div className="flex items-baseline justify-between mt-1">
-                  <span className="text-sm font-bold text-white font-mono">{item.rate}</span>
-                  <span className="text-[10px] text-emerald-400 font-semibold">{item.change}</span>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {(marketPrices.length > 0 ? marketPrices : CROPS_CATALOG).map((item, idx) => {
+              const cropKey = item.crop_key || item.id || item.key;
+              const localizedName = getCropName(cropKey, lang) || item.crop_name_en || cropKey;
+              const msp = item.msp_rate || item.msp;
+              const market = item.current_market_price || item.market_rate || item.marketPrice;
+              const sourceMandi = item.source_mandi || 'Karnal Hub';
+
+              return (
+                <div
+                  key={cropKey || idx}
+                  className="bg-slate-950/80 border border-slate-800/80 hover:border-kisan-500/50 rounded-xl p-3 flex flex-col justify-between transition-colors shadow-sm"
+                >
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <span className="text-xs font-bold text-white truncate flex items-center gap-1">
+                      <span>{item.icon || '🌾'}</span>
+                      {localizedName}
+                    </span>
+                    <span className="text-[10px] text-emerald-400 font-semibold">{item.change || item.price_change || '+₹150'}</span>
+                  </div>
+
+                  <div className="space-y-1 my-1">
+                    <div className="flex justify-between items-baseline text-[11px]">
+                      <span className="text-slate-400">MSP Floor:</span>
+                      <span className="font-bold text-emerald-400 font-mono">₹{msp}</span>
+                    </div>
+                    <div className="flex justify-between items-baseline text-[11px]">
+                      <span className="text-slate-400">Market:</span>
+                      <span className="font-bold text-white font-mono">₹{market}</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-1.5 border-t border-slate-800/80 text-[10px] text-slate-500 truncate">
+                    {sourceMandi}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -100,72 +167,88 @@ export default function Home({ onOpenAiModal }) {
           <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-kisan-500/10 rounded-full blur-3xl pointer-events-none"></div>
           <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-          <div className="relative z-10 max-w-3xl space-y-6">
+          <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-kisan-500/10 border border-kisan-500/30 text-kisan-400 text-xs font-semibold">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              Next-Gen National Mandi Platform
-            </div>
+            <div className="lg:col-span-8 space-y-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-kisan-500/10 border border-kisan-500/30 text-kisan-400 text-xs font-semibold">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                Next-Gen National Mandi Platform
+              </div>
 
-            <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
-              {t('hero_title')}
-            </h1>
+              <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
+                {t('hero_title')}
+              </h1>
 
-            <p className="text-base sm:text-lg text-slate-300 leading-relaxed">
-              {t('hero_subtitle')}
-            </p>
-
-            {/* CTA Buttons */}
-            <div className="flex flex-wrap items-center gap-4 pt-2">
-              <Link
-                to="/book-slot"
-                className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-kisan-600 to-kisan-500 hover:from-kisan-500 hover:to-kisan-400 text-white font-bold text-sm sm:text-base flex items-center gap-2 shadow-lg shadow-kisan-600/30 transition-all hover:scale-[1.02]"
-              >
-                <Calendar className="w-5 h-5" />
-                {t('cta_book_now')}
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Link>
-
-              <button
-                onClick={onOpenAiModal}
-                className="px-5 py-3.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-amber-300 font-semibold text-sm sm:text-base flex items-center gap-2 transition-all hover:border-amber-400/50"
-              >
-                <Sparkles className="w-5 h-5 text-amber-400" />
-                {t('cta_ai_help')}
-              </button>
-
-              <Link
-                to="/centre/officer"
-                className="px-5 py-3.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 font-medium text-sm sm:text-base flex items-center gap-2 transition-colors"
-              >
-                <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                {t('nav_officer_portal')}
-              </Link>
-            </div>
-
-            {/* Quick Live Token Search Input */}
-            <div className="pt-6 border-t border-slate-800/80">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                Already have a token? Check live queue status:
+              <p className="text-base sm:text-lg text-slate-300 leading-relaxed">
+                {t('hero_subtitle')}
               </p>
-              <form onSubmit={handleTrackToken} className="flex max-w-md gap-2">
-                <div className="relative flex-1">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={tokenSearchInput}
-                    onChange={(e) => setTokenSearchInput(e.target.value)}
-                    placeholder="Enter Token (e.g. TK-101 or MND-042)"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-kisan-500 uppercase font-mono"
+
+              {/* CTA Buttons */}
+              <div className="flex flex-wrap items-center gap-4 pt-2">
+                <Link
+                  to="/book-slot"
+                  className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-kisan-600 to-kisan-500 hover:from-kisan-500 hover:to-kisan-400 text-white font-bold text-sm sm:text-base flex items-center gap-2 shadow-lg shadow-kisan-600/30 transition-all hover:scale-[1.02]"
+                >
+                  <Calendar className="w-5 h-5" />
+                  {t('cta_book_now')}
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </Link>
+
+                <button
+                  onClick={onOpenAiModal}
+                  className="px-5 py-3.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-amber-300 font-semibold text-sm sm:text-base flex items-center gap-2 transition-all hover:border-amber-400/50"
+                >
+                  <Sparkles className="w-5 h-5 text-amber-400" />
+                  {t('cta_ai_help')}
+                </button>
+
+                <Link
+                  to="/centre/officer"
+                  className="px-5 py-3.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 font-medium text-sm sm:text-base flex items-center gap-2 transition-colors"
+                >
+                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                  {t('nav_officer_portal')}
+                </Link>
+              </div>
+
+              {/* Quick Live Token Search Input */}
+              <div className="pt-6 border-t border-slate-800/80">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                  Already have a token? Check live queue status:
+                </p>
+                <form onSubmit={handleTrackToken} className="flex max-w-md gap-2">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={tokenSearchInput}
+                      onChange={(e) => setTokenSearchInput(e.target.value)}
+                      placeholder="Enter Token (e.g. TK-101 or MND-042)"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-kisan-500 uppercase font-mono"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-sm font-semibold transition-colors flex items-center gap-1.5"
+                  >
+                    Track <ChevronRight className="w-4 h-4" />
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            {/* Right Branded Seal & Shield Card */}
+            <div className="hidden lg:flex lg:col-span-4 justify-center">
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-kisan-500 to-amber-500 rounded-full blur-xl opacity-40 group-hover:opacity-60 transition duration-500"></div>
+                <div className="relative w-52 h-52 sm:w-60 sm:h-60 rounded-full bg-white p-2 shadow-2xl ring-4 ring-kisan-500/40 flex items-center justify-center transition-transform transform group-hover:scale-105 duration-300">
+                  <img
+                    src="/logo.png"
+                    alt="KisanSetu Official Seal"
+                    className="w-full h-full object-cover rounded-full"
                   />
                 </div>
-                <button
-                  type="submit"
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-sm font-semibold transition-colors flex items-center gap-1.5"
-                >
-                  Track <ChevronRight className="w-4 h-4" />
-                </button>
-              </form>
+              </div>
             </div>
 
           </div>
@@ -263,7 +346,12 @@ export default function Home({ onOpenAiModal }) {
         </div>
       </div>
 
-      {/* 4. Why KisanSetu System Advantages */}
+      {/* 4. Commodity Price Trends & 7-Day APMC Trajectory */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <MarketPriceTrends lang={lang} />
+      </div>
+
+      {/* 5. Why KisanSetu System Advantages */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-10 space-y-2">
           <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">

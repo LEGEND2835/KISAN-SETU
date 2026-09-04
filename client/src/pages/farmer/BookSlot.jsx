@@ -20,15 +20,16 @@ import {
 import { centresAPI, slotsAPI, aiAPI } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { getCropName } from '../../utils/cropsData';
 
 const CROPS = [
-  { name: 'Wheat', variety: 'HD-2967 (Grade A)', msp: '₹2,275/Qtl', icon: '🌾' },
-  { name: 'Paddy (Basmati)', variety: 'Pusa 1121', msp: '₹4,200/Qtl', icon: '🌾' },
-  { name: 'Paddy (PR)', variety: 'PR-126', msp: '₹2,183/Qtl', icon: '🌾' },
-  { name: 'Mustard', variety: 'Pusa Bold', msp: '₹5,650/Qtl', icon: '🌱' },
-  { name: 'Gram', variety: 'Kabuli/Desi', msp: '₹5,440/Qtl', icon: '🌿' },
-  { name: 'Maize', variety: 'Hybrid Yellow', msp: '₹2,090/Qtl', icon: '🌽' },
-  { name: 'Soybean', variety: 'JS-335', msp: '₹4,600/Qtl', icon: '🌱' },
+  { key: 'wheat', name: 'Wheat', variety: 'HD-2967 (Grade A)', msp: '₹2,275/Qtl', icon: '🌾' },
+  { key: 'paddy_basmati', name: 'Paddy (Basmati)', variety: 'Pusa 1121', msp: '₹4,200/Qtl', icon: '🌾' },
+  { key: 'paddy_pr', name: 'Paddy (PR)', variety: 'PR-126', msp: '₹2,183/Qtl', icon: '🌾' },
+  { key: 'mustard', name: 'Mustard', variety: 'Pusa Bold', msp: '₹5,650/Qtl', icon: '🌱' },
+  { key: 'gram', name: 'Gram', variety: 'Kabuli/Desi', msp: '₹5,440/Qtl', icon: '🌿' },
+  { key: 'maize', name: 'Maize', variety: 'Hybrid Yellow', msp: '₹2,090/Qtl', icon: '🌽' },
+  { key: 'soybean', name: 'Soybean', variety: 'JS-335', msp: '₹4,600/Qtl', icon: '🌱' },
 ];
 
 const VEHICLES = [
@@ -40,7 +41,7 @@ const VEHICLES = [
 
 export default function BookSlot() {
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -291,25 +292,28 @@ export default function BookSlot() {
                 Crop Type & Variety
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {CROPS.map((c) => (
-                  <button
-                    key={c.name}
-                    type="button"
-                    onClick={() => {
-                      setCropName(c.name);
-                      setCropVariety(c.variety);
-                    }}
-                    className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all ${
-                      cropName === c.name
-                        ? 'bg-kisan-600/20 border-kisan-500 text-white shadow-md'
-                        : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700'
-                    }`}
-                  >
-                    <span className="text-2xl mb-1">{c.icon}</span>
-                    <span className="font-bold text-sm text-white">{c.name}</span>
-                    <span className="text-[11px] text-emerald-400 font-semibold">{c.msp}</span>
-                  </button>
-                ))}
+                {CROPS.map((c) => {
+                  const localizedName = getCropName(c.key || c.name, lang);
+                  return (
+                    <button
+                      key={c.key || c.name}
+                      type="button"
+                      onClick={() => {
+                        setCropName(c.name);
+                        setCropVariety(c.variety);
+                      }}
+                      className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all ${
+                        cropName === c.name
+                          ? 'bg-kisan-600/20 border-kisan-500 text-white shadow-md'
+                          : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700'
+                      }`}
+                    >
+                      <span className="text-2xl mb-1">{c.icon}</span>
+                      <span className="font-bold text-sm text-white">{localizedName}</span>
+                      <span className="text-[11px] text-emerald-400 font-semibold">{c.msp}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

@@ -84,8 +84,12 @@ export default function PublicMandiDisplay() {
       {/* 1. Header Display Bar */}
       <div className="flex items-center justify-between border-b-2 border-slate-800 pb-4">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-kisan-600 flex items-center justify-center shadow-lg shadow-kisan-600/30">
-            <Tractor className="w-9 h-9 text-white" />
+          <div className="w-16 h-16 rounded-full overflow-hidden bg-white shadow-xl shadow-kisan-600/40 ring-2 ring-kisan-400 p-1 flex items-center justify-center">
+            <img 
+              src="/logo.png" 
+              alt="KisanSetu Official Seal" 
+              className="w-full h-full object-cover rounded-full"
+            />
           </div>
           <div>
             <div className="flex items-center gap-3">

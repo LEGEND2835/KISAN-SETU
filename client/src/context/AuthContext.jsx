@@ -4,6 +4,12 @@ import { authAPI } from '../services/api';
 const AuthContext = createContext();
 
 export const DEMO_PROFILES = {
+  ADMIN: {
+    phone: '9876543200',
+    password: 'admin123',
+    label: 'Super Admin (Dr. Vikram Sarabhai)',
+    role: 'admin',
+  },
   FARMER: {
     phone: '9876543210',
     password: 'farmer123',
@@ -83,6 +89,16 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const updateUserSession = (updatedUser, newToken) => {
+    if (newToken) {
+      localStorage.setItem('kisansetu_token', newToken);
+    }
+    if (updatedUser) {
+      localStorage.setItem('kisansetu_user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -92,6 +108,7 @@ export function AuthProvider({ children }) {
         registerFarmer,
         logout,
         quickSwitchProfile,
+        updateUserSession,
         isFarmer: user?.role === 'farmer',
         isOfficer: ['centre_officer', 'admin'].includes(user?.role),
         isInspector: ['quality_inspector', 'admin'].includes(user?.role),

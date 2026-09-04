@@ -29,6 +29,7 @@ router.post(
     const {
       booking_id,
       inspector_id,
+      decision, // 'PASS' | 'REJECT'
       moisture_percentage,
       foreign_matter_percentage,
       damaged_grains_percentage,
@@ -54,31 +55,34 @@ router.post(
       }
     }
 
+    const isReject = decision === 'REJECT';
+    if (isReject && (!remarks || !remarks.trim())) {
+      return res.status(400).json({ success: false, message: 'Rejection reason/remarks are mandatory when rejecting grain quality.' });
+    }
+
     const moisture = parseFloat(moisture_percentage || 12.0);
     const foreign = parseFloat(foreign_matter_percentage || 1.0);
     const damaged = parseFloat(damaged_grains_percentage || 0.5);
 
-    // Automatic Quality Grading Formula
+    // Quality Grading
     let grainGrade = 'FAQ';
     let deductionPercentage = 0.0;
 
-    if (moisture > 14.0 || foreign > 4.0 || damaged > 5.0) {
+    if (isReject) {
       grainGrade = 'REJECTED';
     } else if (moisture <= 12.0 && foreign <= 1.0 && damaged <= 1.0) {
       grainGrade = 'GRADE_A';
     } else {
       grainGrade = 'FAQ';
-      if (moisture > 12.0) {
-        deductionPercentage += (moisture - 12.0) * 0.5;
-      }
-      if (foreign > 1.5) {
-        deductionPercentage += (foreign - 1.5) * 1.0;
-      }
+      if (moisture > 12.0) deductionPercentage += (moisture - 12.0) * 0.5;
+      if (foreign > 1.5) deductionPercentage += (foreign - 1.5) * 1.0;
     }
 
     const estQty = parseFloat(booking.estimated_quantity_quintals);
     const deductionsQuintals = parseFloat(((estQty * deductionPercentage) / 100).toFixed(2));
     const approvedQuantity = parseFloat((estQty - deductionsQuintals).toFixed(2));
+
+    const finalRemarks = remarks?.trim() || (isReject ? 'Exceeds maximum permissible moisture/foreign limits.' : `Approved as ${grainGrade}.`);
 
     const qualityRecord = {
       id: `qc_${Date.now()}`,
@@ -88,14 +92,16 @@ router.post(
       foreign_matter_percentage: foreign,
       damaged_grains_percentage: damaged,
       grain_grade: grainGrade,
-      approved_quantity_quintals: grainGrade === 'REJECTED' ? 0 : approvedQuantity,
+      approved_quantity_quintals: isReject ? 0 : approvedQuantity,
       deductions_quintals: deductionsQuintals,
-      remarks: remarks || (grainGrade === 'REJECTED' ? 'Exceeds maximum permissible moisture/foreign limits.' : `Approved as ${grainGrade}.`),
+      remarks: finalRemarks,
       inspected_at: new Date().toISOString(),
     };
 
-    const nextStatus = grainGrade === 'REJECTED' ? 'REJECTED' : 'WEIGHING';
-    const nextStation = grainGrade === 'REJECTED' ? 'DISPATCH_REJECTED' : 'WEIGHBRIDGE_1';
+    const nextStatus = isReject ? 'REJECTED' : 'WEIGHING';
+    const nextStation = isReject ? 'DISPATCH_REJECTED' : 'WEIGHBRIDGE_1';
+    const rejectionStage = isReject ? 'QUALITY_INSPECTION' : null;
+    const rejectionReason = isReject ? finalRemarks : null;
 
     if (!isUsingMockStore && pool) {
       await pool.query(
@@ -114,14 +120,14 @@ router.post(
       );
 
       await pool.query(
-        'UPDATE bookings SET status = $1, current_station = $2 WHERE id = $3',
-        [nextStatus, nextStation, booking.id]
+        'UPDATE bookings SET status = $1, current_station = $2, rejection_stage = $3, rejection_reason = $4 WHERE id = $5',
+        [nextStatus, nextStation, rejectionStage, rejectionReason, booking.id]
       );
 
       await pool.query(
         `INSERT INTO queue_audit_logs (id, booking_id, from_status, to_status, station, notes, timestamp)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [`log_${Date.now()}`, booking.id, booking.status, nextStatus, nextStation, `Grade: ${grainGrade}`, new Date().toISOString()]
+        [`log_${Date.now()}`, booking.id, booking.status, nextStatus, nextStation, isReject ? `REJECTED in Lab: ${finalRemarks}` : `PASSED: Grade ${grainGrade}`, new Date().toISOString()]
       );
     } else {
       const existingIndex = inMemoryStore.quality_checks.findIndex(q => q.booking_id === booking.id);
@@ -132,13 +138,17 @@ router.post(
       }
       booking.status = nextStatus;
       booking.current_station = nextStation;
+      booking.rejection_stage = rejectionStage;
+      booking.rejection_reason = rejectionReason;
     }
 
     broadcastQueueUpdate(booking.centre_id);
 
     return res.json({
       success: true,
-      message: `Quality inspection recorded! Grade: ${grainGrade}`,
+      message: isReject 
+        ? `Quality inspection REJECTED: ${finalRemarks}` 
+        : `Quality inspection PASSED! Grade: ${grainGrade} -> Forwarded to Weighbridge.`,
       quality: qualityRecord,
       next_stage: nextStatus,
     });
@@ -155,7 +165,14 @@ router.post(
   authorizeRoles('weighbridge_operator', 'centre_officer', 'admin'),
   async (req, res) => {
   try {
-    const { booking_id, operator_id, gross_weight_kg, tare_weight_kg } = req.body;
+    const { 
+      booking_id, 
+      operator_id, 
+      decision, // 'PASS' | 'REJECT'
+      gross_weight_kg, 
+      tare_weight_kg,
+      remarks,
+    } = req.body;
 
     if (!booking_id) {
       return res.status(400).json({ success: false, message: 'booking_id is required.' });
@@ -186,12 +203,50 @@ router.post(
       farmer = inMemoryStore.users.find(u => u.id === booking.farmer_id);
     }
 
+    const isReject = decision === 'REJECT';
+    if (isReject && (!remarks || !remarks.trim())) {
+      return res.status(400).json({ success: false, message: 'Rejection reason/remarks are mandatory when rejecting at Weighbridge.' });
+    }
+
+    const now = new Date().toISOString();
+
+    if (isReject) {
+      const finalRemarks = remarks.trim();
+      const nextStatus = 'REJECTED';
+      const nextStation = 'DISPATCH_REJECTED';
+
+      if (!isUsingMockStore && pool) {
+        await pool.query(
+          'UPDATE bookings SET status = $1, current_station = $2, rejection_stage = $3, rejection_reason = $4 WHERE id = $5',
+          [nextStatus, nextStation, 'WEIGHBRIDGE', finalRemarks, booking.id]
+        );
+
+        await pool.query(
+          `INSERT INTO queue_audit_logs (id, booking_id, from_status, to_status, station, notes, timestamp)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [`log_${Date.now()}`, booking.id, booking.status, nextStatus, nextStation, `REJECTED at Weighbridge: ${finalRemarks}`, now]
+        );
+      } else {
+        booking.status = nextStatus;
+        booking.current_station = nextStation;
+        booking.rejection_stage = 'WEIGHBRIDGE';
+        booking.rejection_reason = finalRemarks;
+      }
+
+      broadcastQueueUpdate(booking.centre_id);
+
+      return res.json({
+        success: true,
+        message: `Weighbridge measurement REJECTED: ${finalRemarks}`,
+        booking_status: nextStatus,
+      });
+    }
+
     const gross = gross_weight_kg !== undefined ? parseFloat(gross_weight_kg) : (existingWeigh ? parseFloat(existingWeigh.gross_weight_kg) : 0);
     const tare = tare_weight_kg !== undefined ? parseFloat(tare_weight_kg) : (existingWeigh ? parseFloat(existingWeigh.tare_weight_kg) : 0);
 
     const netKg = Math.max(0, gross - tare);
     const netQuintals = parseFloat((netKg / 100).toFixed(2));
-    const now = new Date().toISOString();
 
     const weighRecord = {
       id: existingWeigh ? existingWeigh.id : `wb_${Date.now()}`,
@@ -228,7 +283,7 @@ router.post(
 
         await client.query(
           `UPDATE bookings 
-           SET status = $1, current_station = $2, completion_time = COALESCE($3, completion_time) 
+           SET status = $1, current_station = $2, completion_time = COALESCE($3, completion_time), rejection_stage = NULL, rejection_reason = NULL 
            WHERE id = $4`,
           [nextStatus, nextStation, isComplete ? now : null, booking.id]
         );
@@ -263,6 +318,8 @@ router.post(
 
       booking.status = nextStatus;
       booking.current_station = nextStation;
+      booking.rejection_stage = null;
+      booking.rejection_reason = null;
       if (isComplete) {
         booking.completion_time = now;
         const mspRate = MSP_RATES[booking.crop_name] || 2275.0;
@@ -288,7 +345,7 @@ router.post(
 
     return res.json({
       success: true,
-      message: isComplete ? 'Tare weight logged! Procurement cycle completed.' : 'Gross weight logged! Proceed to Unloading Bay.',
+      message: isComplete ? 'Tare weight logged! Procurement cycle completed & J-Form ready.' : 'Gross weight logged! Proceed to Unloading Bay.',
       weighbridge: weighRecord,
       booking_status: nextStatus,
     });
@@ -547,6 +604,123 @@ router.get('/analytics', async (req, res) => {
   } catch (error) {
     console.error('Analytics Error:', error);
     return res.status(500).json({ success: false, message: 'Failed to retrieve analytics.' });
+  }
+});
+
+// GET /api/procurement/market-prices - Structured commodity prices with MSP, Market Price, Source Mandi, and Last-Updated timestamps
+router.get('/market-prices', async (req, res) => {
+  try {
+    const now = new Date();
+    const formattedTime = `Today, ${now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
+
+    const prices = [
+      {
+        id: 'wheat',
+        crop_name_en: 'Wheat',
+        crop_name_hi: 'गेहूं',
+        crop_name_pb: 'ਕਣਕ',
+        variety: 'HD-2967 (Grade A)',
+        msp_rate: 2275,
+        current_market_price: 2320,
+        price_unit: '₹/Qtl',
+        price_change: '+₹150',
+        price_trend: 'UP',
+        source_mandi: 'Karnal Mega Grain Terminal (APMC)',
+        last_updated: formattedTime,
+        last_updated_at: now.toISOString(),
+        is_reference_feed: true,
+      },
+      {
+        id: 'paddy_basmati',
+        crop_name_en: 'Paddy (Basmati)',
+        crop_name_hi: 'धान (बासमती)',
+        crop_name_pb: 'ਝੋਨਾ (ਬਾਸਮਤੀ)',
+        variety: 'Pusa 1121',
+        msp_rate: 4200,
+        current_market_price: 4350,
+        price_unit: '₹/Qtl',
+        price_change: '+₹220',
+        price_trend: 'UP',
+        source_mandi: 'Khanna Asia Grain Terminal (APMC)',
+        last_updated: formattedTime,
+        last_updated_at: now.toISOString(),
+        is_reference_feed: true,
+      },
+      {
+        id: 'mustard',
+        crop_name_en: 'Mustard',
+        crop_name_hi: 'सरसों',
+        crop_name_pb: 'ਸਰ੍ਹੋਂ',
+        variety: 'Pusa Bold (FAQ)',
+        msp_rate: 5650,
+        current_market_price: 5780,
+        price_unit: '₹/Qtl',
+        price_change: '+₹300',
+        price_trend: 'UP',
+        source_mandi: 'Kota Agro Procurement Yard (APMC)',
+        last_updated: formattedTime,
+        last_updated_at: now.toISOString(),
+        is_reference_feed: true,
+      },
+      {
+        id: 'gram',
+        crop_name_en: 'Gram (Chana)',
+        crop_name_hi: 'चना',
+        crop_name_pb: 'ਛੋਲੇ',
+        variety: 'Kabuli/Desi',
+        msp_rate: 5440,
+        current_market_price: 5590,
+        price_unit: '₹/Qtl',
+        price_change: '+₹105',
+        price_trend: 'UP',
+        source_mandi: 'Nizamabad Market Yard (APMC)',
+        last_updated: formattedTime,
+        last_updated_at: now.toISOString(),
+        is_reference_feed: true,
+      },
+      {
+        id: 'maize',
+        crop_name_en: 'Maize',
+        crop_name_hi: 'मक्का',
+        crop_name_pb: 'ਮੱਕੀ',
+        variety: 'Hybrid Yellow',
+        msp_rate: 2090,
+        current_market_price: 2150,
+        price_unit: '₹/Qtl',
+        price_change: '+₹90',
+        price_trend: 'UP',
+        source_mandi: 'Nizamabad Market Yard (APMC)',
+        last_updated: formattedTime,
+        last_updated_at: now.toISOString(),
+        is_reference_feed: true,
+      },
+      {
+        id: 'soybean',
+        crop_name_en: 'Soybean',
+        crop_name_hi: 'सोयाबीन',
+        crop_name_pb: 'ਸੋਇਆਬੀਨ',
+        variety: 'JS-335',
+        msp_rate: 4600,
+        current_market_price: 4720,
+        price_unit: '₹/Qtl',
+        price_change: '+₹140',
+        price_trend: 'UP',
+        source_mandi: 'Kota Agro Procurement Yard (APMC)',
+        last_updated: formattedTime,
+        last_updated_at: now.toISOString(),
+        is_reference_feed: true,
+      },
+    ];
+
+    return res.json({
+      success: true,
+      source: 'Government APMC / e-NAM Reference Feed',
+      last_synced: now.toISOString(),
+      prices,
+    });
+  } catch (error) {
+    console.error('Market Prices Error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to retrieve market prices.' });
   }
 });
 

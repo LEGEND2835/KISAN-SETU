@@ -92,6 +92,21 @@ export async function runSeed() {
       bank_account_last4: '0000',
       ifsc_code: 'SBIN0001000',
     },
+    {
+      id: 'usr_admin_1',
+      full_name: 'Dr. Vikram Sarabhai',
+      phone: '9876543200',
+      email: 'admin.director@kisansetu.gov.in',
+      role: 'admin',
+      password_hash: passwordHashOfficer,
+      state: 'New Delhi',
+      district: 'Central Delhi',
+      village: 'Krishi Bhawan Headquarters',
+      designation: 'National Procurement Director',
+      aadhaar_last4: '9999',
+      bank_account_last4: '0000',
+      ifsc_code: 'SBIN0001000',
+    },
   ];
 
   const centresData = [
@@ -363,10 +378,10 @@ export async function runSeed() {
     try {
       for (const u of usersData) {
         await pool.query(
-          `INSERT INTO users (id, full_name, phone, email, role, password_hash, state, district, village, aadhaar_last4, bank_account_last4, ifsc_code)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-           ON CONFLICT (phone) DO UPDATE SET full_name = EXCLUDED.full_name, password_hash = EXCLUDED.password_hash`,
-          [u.id, u.full_name, u.phone, u.email, u.role, u.password_hash, u.state, u.district, u.village, u.aadhaar_last4, u.bank_account_last4, u.ifsc_code]
+          `INSERT INTO users (id, full_name, phone, email, role, password_hash, state, district, village, aadhaar_last4, bank_account_last4, ifsc_code, designation)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+           ON CONFLICT (phone) DO UPDATE SET full_name = EXCLUDED.full_name, role = EXCLUDED.role, password_hash = EXCLUDED.password_hash, designation = EXCLUDED.designation`,
+          [u.id, u.full_name, u.phone, u.email, u.role, u.password_hash, u.state, u.district, u.village, u.aadhaar_last4, u.bank_account_last4, u.ifsc_code, u.designation || null]
         );
       }
 

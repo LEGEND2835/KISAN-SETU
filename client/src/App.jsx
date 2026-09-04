@@ -13,9 +13,11 @@ import BookSlot from './pages/farmer/BookSlot';
 import TokenPass from './pages/farmer/TokenPass';
 import MyBookings from './pages/farmer/MyBookings';
 import OfficerDashboard from './pages/centre/OfficerDashboard';
+import AdminDashboard from './pages/admin/AdminDashboard';
 import PublicMandiDisplay from './pages/display/PublicMandiDisplay';
 import Login from './pages/auth/Login';
 import MandiAnalytics from './pages/analytics/MandiAnalytics';
+import Profile from './pages/account/Profile';
 
 function AppLayout() {
   const location = useLocation();
@@ -49,10 +51,26 @@ function AppLayout() {
             }
           />
           <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/centre/officer"
             element={
               <ProtectedRoute allowedRoles={['centre_officer', 'quality_inspector', 'weighbridge_operator', 'admin']}>
                 <OfficerDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminDashboard />
               </ProtectedRoute>
             }
           />

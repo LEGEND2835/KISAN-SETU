@@ -24,7 +24,11 @@ router.post('/register-farmer', async (req, res) => {
     }
 
     if (existingUser) {
-      return res.status(400).json({ success: false, message: 'User with this phone number already exists.' });
+      return res.status(400).json({
+        success: false,
+        code: 'PHONE_ALREADY_EXISTS',
+        message: 'Phone number already exists. Please use a different number.',
+      });
     }
 
     const passwordHash = await bcrypt.hash(password || 'farmer123', 8);
@@ -164,24 +168,202 @@ router.get('/me', authenticateToken, async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found.' });
     }
 
+    const crops = typeof user.crops === 'string' ? JSON.parse(user.crops || '[]') : (user.crops || []);
+
     return res.json({
       success: true,
       user: {
         id: user.id,
         full_name: user.full_name,
         phone: user.phone,
+        email: user.email || '',
         role: user.role,
         state: user.state,
         district: user.district,
-        village: user.village,
-        aadhaar_last4: user.aadhaar_last4,
-        bank_account_last4: user.bank_account_last4,
-        ifsc_code: user.ifsc_code,
+        village: user.village || '',
+        address: user.address || user.village || '',
+        dob: user.dob || '',
+        crops,
+        designation: user.designation || '',
+        centre_id: user.centre_id || '',
+        aadhaar_last4: user.aadhaar_last4 || '',
+        bank_account_last4: user.bank_account_last4 || '',
+        ifsc_code: user.ifsc_code || '',
+        created_at: user.created_at,
       },
     });
   } catch (error) {
     console.error('Fetch Profile Error:', error);
     return res.status(500).json({ success: false, message: 'Failed to retrieve profile.' });
+  }
+});
+
+// PUT /api/auth/profile - Update personal profile details
+router.put('/profile', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const {
+      full_name,
+      phone,
+      email,
+      dob,
+      state,
+      district,
+      village,
+      address,
+      crops,
+      designation,
+      centre_id,
+      aadhaar_last4,
+      bank_account_last4,
+      ifsc_code,
+    } = req.body;
+
+    // 1. Fetch current user
+    let user = null;
+    if (!isUsingMockStore && pool) {
+      const uRes = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+      if (uRes.rows.length > 0) user = uRes.rows[0];
+    } else {
+      user = inMemoryStore.users.find(u => u.id === userId);
+    }
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User account not found.' });
+    }
+
+    // 2. Validate phone uniqueness if phone is changing
+    const newPhone = phone ? phone.trim() : user.phone;
+    if (newPhone !== user.phone) {
+      let phoneConflict = null;
+      if (!isUsingMockStore && pool) {
+        const checkRes = await pool.query('SELECT id FROM users WHERE phone = $1 AND id != $2', [newPhone, userId]);
+        if (checkRes.rows.length > 0) phoneConflict = checkRes.rows[0];
+      } else {
+        phoneConflict = inMemoryStore.users.find(u => u.phone === newPhone && u.id !== userId);
+      }
+
+      if (phoneConflict) {
+        return res.status(400).json({
+          success: false,
+          code: 'PHONE_ALREADY_EXISTS',
+          message: 'Phone number already exists. Please use a different number.',
+        });
+      }
+    }
+
+    // 3. Prepare updated values
+    const updatedFullName = full_name !== undefined ? full_name.trim() : user.full_name;
+    const updatedEmail = email !== undefined ? email.trim() : user.email;
+    const updatedDob = dob !== undefined ? dob : (user.dob || '');
+    const updatedState = state !== undefined ? state.trim() : user.state;
+    const updatedDistrict = district !== undefined ? district.trim() : user.district;
+    const updatedVillage = village !== undefined ? village.trim() : (user.village || '');
+    const updatedAddress = address !== undefined ? address.trim() : (user.address || updatedVillage);
+    const updatedCrops = crops !== undefined ? (Array.isArray(crops) ? crops : JSON.parse(crops || '[]')) : (typeof user.crops === 'string' ? JSON.parse(user.crops || '[]') : (user.crops || []));
+    const updatedDesignation = designation !== undefined ? designation.trim() : (user.designation || '');
+    const updatedCentreId = centre_id !== undefined ? centre_id : (user.centre_id || '');
+    const updatedAadhaar = aadhaar_last4 !== undefined ? aadhaar_last4 : (user.aadhaar_last4 || '');
+    const updatedBank = bank_account_last4 !== undefined ? bank_account_last4 : (user.bank_account_last4 || '');
+    const updatedIfsc = ifsc_code !== undefined ? ifsc_code : (user.ifsc_code || '');
+
+    // 4. Update in Database
+    if (!isUsingMockStore && pool) {
+      await pool.query(
+        `UPDATE users
+         SET full_name = $1,
+             phone = $2,
+             email = $3,
+             dob = $4,
+             state = $5,
+             district = $6,
+             village = $7,
+             address = $8,
+             crops = $9,
+             designation = $10,
+             centre_id = $11,
+             aadhaar_last4 = $12,
+             bank_account_last4 = $13,
+             ifsc_code = $14
+         WHERE id = $15`,
+        [
+          updatedFullName,
+          newPhone,
+          updatedEmail,
+          updatedDob,
+          updatedState,
+          updatedDistrict,
+          updatedVillage,
+          updatedAddress,
+          JSON.stringify(updatedCrops),
+          updatedDesignation,
+          updatedCentreId || null,
+          updatedAadhaar,
+          updatedBank,
+          updatedIfsc,
+          userId,
+        ]
+      );
+    }
+
+    // 5. Update in-memory fallback store
+    const memIdx = inMemoryStore.users.findIndex(u => u.id === userId);
+    const updatedUserObj = {
+      ...user,
+      full_name: updatedFullName,
+      phone: newPhone,
+      email: updatedEmail,
+      dob: updatedDob,
+      state: updatedState,
+      district: updatedDistrict,
+      village: updatedVillage,
+      address: updatedAddress,
+      crops: updatedCrops,
+      designation: updatedDesignation,
+      centre_id: updatedCentreId,
+      aadhaar_last4: updatedAadhaar,
+      bank_account_last4: updatedBank,
+      ifsc_code: updatedIfsc,
+    };
+    if (memIdx !== -1) {
+      inMemoryStore.users[memIdx] = updatedUserObj;
+    }
+
+    // 6. Issue fresh JWT token with updated info
+    const newToken = generateToken({
+      id: userId,
+      phone: newPhone,
+      role: user.role,
+      name: updatedFullName,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Profile updated successfully.',
+      token: newToken,
+      user: {
+        id: userId,
+        full_name: updatedFullName,
+        phone: newPhone,
+        email: updatedEmail,
+        role: user.role,
+        dob: updatedDob,
+        state: updatedState,
+        district: updatedDistrict,
+        village: updatedVillage,
+        address: updatedAddress,
+        crops: updatedCrops,
+        designation: updatedDesignation,
+        centre_id: updatedCentreId,
+        aadhaar_last4: updatedAadhaar,
+        bank_account_last4: updatedBank,
+        ifsc_code: updatedIfsc,
+        created_at: user.created_at,
+      },
+    });
+  } catch (error) {
+    console.error('Update Profile Error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update profile.' });
   }
 });
 

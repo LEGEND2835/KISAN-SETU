@@ -74,8 +74,21 @@ CREATE TABLE IF NOT EXISTS bookings (
     check_in_time TIMESTAMP WITH TIME ZONE,
     called_time TIMESTAMP WITH TIME ZONE,
     completion_time TIMESTAMP WITH TIME ZONE,
+    rejection_stage VARCHAR(60), -- 'QUALITY_INSPECTION', 'WEIGHBRIDGE', 'GATE'
+    rejection_reason TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Ensure columns exist in existing PostgreSQL databases (Backward-compatible non-destructive migrations)
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS rejection_stage VARCHAR(60);
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS dob VARCHAR(30);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS crops JSONB DEFAULT '[]';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS centre_id VARCHAR(64);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS designation VARCHAR(100);
+ALTER TABLE centres ADD COLUMN IF NOT EXISTS contact_phone VARCHAR(20);
+ALTER TABLE centres ADD COLUMN IF NOT EXISTS operating_hours VARCHAR(100) DEFAULT '08:00 AM - 06:00 PM';
 
 -- 5. Quality Inspection Checks
 CREATE TABLE IF NOT EXISTS quality_checks (
