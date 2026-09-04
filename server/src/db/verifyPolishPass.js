@@ -95,12 +95,12 @@ async function runPolishVerification() {
     );
     const newFarmerToken = loginRes.token;
 
-    // Get centres and available slot
+    // Get centres and available slot (future date ensures slot is never expired regardless of time of day)
     const centresRes = await fetch(`${baseUrl}/centres`).then(r => r.json());
     const centreId = centresRes.centres[0].id;
-    const today = new Date().toISOString().split('T')[0];
-    const slotsRes = await fetch(`${baseUrl}/slots?centre_id=${centreId}&date=${today}`).then(r => r.json());
-    const targetSlot = slotsRes.slots[0];
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+    const slotsRes = await fetch(`${baseUrl}/slots?centre_id=${centreId}&date=${tomorrow}`).then(r => r.json());
+    const targetSlot = slotsRes.slots.find(s => s.is_bookable) || slotsRes.slots[0];
 
     // TEST 4: Vehicle capacity check on backend (reject 60 Qtl on Bullock Cart)
     const invalidBookRes = await fetch(`${baseUrl}/bookings/book`, {

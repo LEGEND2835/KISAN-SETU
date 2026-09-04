@@ -71,11 +71,11 @@ async function runMvpVerification() {
     const centreId = centresRes.centres[0].id; // ctr_karnal_01
 
     // 3. View available slots
-    const today = new Date().toISOString().split('T')[0];
-    const slotsRes = await fetch(`${baseUrl}/slots?centre_id=${centreId}&date=${today}`).then(r => r.json());
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+    const slotsRes = await fetch(`${baseUrl}/slots?centre_id=${centreId}&date=${tomorrow}`).then(r => r.json());
     record(3, 'View available slots', slotsRes.success && slotsRes.slots.length > 0, `Found ${slotsRes.slots?.length} time slots`);
 
-    const targetSlot = slotsRes.slots[0];
+    const targetSlot = slotsRes.slots.find(s => s.is_bookable) || slotsRes.slots[0];
 
     // Setup Socket.IO realtime listener (Item 13)
     let socketReceivedUpdate = false;

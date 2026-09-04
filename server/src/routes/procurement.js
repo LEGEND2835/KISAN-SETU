@@ -2,6 +2,7 @@ import express from 'express';
 import { inMemoryStore, isUsingMockStore, pool } from '../db/index.js';
 import { broadcastQueueUpdate } from '../sockets/queueSocket.js';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
+import { sendQualityCheckSms, sendWeighbridgeSms, sendProcurementCompletedSms } from '../services/notifications.js';
 
 const router = express.Router();
 
@@ -144,6 +145,35 @@ router.post(
 
     broadcastQueueUpdate(booking.centre_id);
 
+    // Fetch registered farmer profile and mandi centre details for SMS notification
+    let farmerUser = null;
+    let centreObj = null;
+
+    if (!isUsingMockStore && pool) {
+      try {
+        const fRes = await pool.query('SELECT id, full_name, phone FROM users WHERE id = $1', [booking.farmer_id]);
+        if (fRes.rows.length > 0) farmerUser = fRes.rows[0];
+        const cRes = await pool.query('SELECT id, name, code, address FROM centres WHERE id = $1', [booking.centre_id]);
+        if (cRes.rows.length > 0) centreObj = cRes.rows[0];
+      } catch (uErr) {
+        console.warn('[SMS] Could not query farmer/centre details for quality check SMS:', uErr.message);
+      }
+    } else {
+      farmerUser = inMemoryStore.users.find(u => u.id === booking.farmer_id);
+      centreObj = inMemoryStore.centres.find(c => c.id === booking.centre_id);
+    }
+
+    // Dispatch Quality Check SMS asynchronously (guaranteed non-blocking)
+    sendQualityCheckSms({
+      booking,
+      farmer: farmerUser,
+      quality: qualityRecord,
+      decision,
+      centre: centreObj,
+    }).catch(smsErr => {
+      console.error('[SMS-SERVICE] Unhandled error during Quality Check SMS dispatch:', smsErr.message);
+    });
+
     return res.json({
       success: true,
       message: isReject 
@@ -234,6 +264,32 @@ router.post(
       }
 
       broadcastQueueUpdate(booking.centre_id);
+
+      // Fetch centre details for SMS
+      let centreObj = null;
+      if (!isUsingMockStore && pool) {
+        try {
+          const cRes = await pool.query('SELECT id, name, code FROM centres WHERE id = $1', [booking.centre_id]);
+          if (cRes.rows.length > 0) centreObj = cRes.rows[0];
+        } catch (cErr) {
+          console.warn('[SMS] Could not query centre details for weighbridge reject SMS:', cErr.message);
+        }
+      } else {
+        centreObj = inMemoryStore.centres.find(c => c.id === booking.centre_id);
+      }
+
+      // Dispatch Weighbridge Reject SMS asynchronously (guaranteed non-blocking)
+      sendWeighbridgeSms({
+        booking,
+        farmer,
+        weighRecord: null,
+        isGrossOnly: false,
+        decision: 'REJECT',
+        remarks: finalRemarks,
+        centre: centreObj,
+      }).catch(smsErr => {
+        console.error('[SMS-SERVICE] Unhandled error during Weighbridge Reject SMS dispatch:', smsErr.message);
+      });
 
       return res.json({
         success: true,
@@ -342,6 +398,44 @@ router.post(
     }
 
     broadcastQueueUpdate(booking.centre_id);
+
+    // Fetch centre details for SMS notification
+    let centreObj = null;
+    if (!isUsingMockStore && pool) {
+      try {
+        const cRes = await pool.query('SELECT id, name, code, address FROM centres WHERE id = $1', [booking.centre_id]);
+        if (cRes.rows.length > 0) centreObj = cRes.rows[0];
+      } catch (cErr) {
+        console.warn('[SMS] Could not query centre details for weighbridge SMS:', cErr.message);
+      }
+    } else {
+      centreObj = inMemoryStore.centres.find(c => c.id === booking.centre_id);
+    }
+
+    if (isComplete) {
+      const mspRate = MSP_RATES[booking.crop_name] || 2275.0;
+      const grossAmount = parseFloat((netQuintals * mspRate).toFixed(2));
+      sendProcurementCompletedSms({
+        booking,
+        farmer,
+        payment: { msp_rate_per_quintal: mspRate, net_payable_amount: grossAmount },
+        weighRecord,
+        centre: centreObj,
+      }).catch(smsErr => {
+        console.error('[SMS-SERVICE] Unhandled error during Procurement Completed SMS dispatch:', smsErr.message);
+      });
+    } else {
+      sendWeighbridgeSms({
+        booking,
+        farmer,
+        weighRecord,
+        isGrossOnly: true,
+        decision: 'PASS',
+        centre: centreObj,
+      }).catch(smsErr => {
+        console.error('[SMS-SERVICE] Unhandled error during Weighbridge Gross SMS dispatch:', smsErr.message);
+      });
+    }
 
     return res.json({
       success: true,

@@ -2,6 +2,7 @@ import express from 'express';
 import { inMemoryStore, isUsingMockStore, pool } from '../db/index.js';
 import { broadcastQueueUpdate, broadcastTokenCall } from '../sockets/queueSocket.js';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
+import { sendGateAdmissionSms, sendGateCallSms } from '../services/notifications.js';
 
 const router = express.Router();
 
@@ -199,6 +200,33 @@ router.post(
       // Broadcast realtime event to room
       broadcastQueueUpdate(centreId);
 
+      // Fetch registered farmer profile and mandi centre details for SMS notification
+      let farmerUser = null;
+      let centreObj = null;
+
+      if (!isUsingMockStore && pool) {
+        try {
+          const fRes = await pool.query('SELECT id, full_name, phone FROM users WHERE id = $1', [booking.farmer_id]);
+          if (fRes.rows.length > 0) farmerUser = fRes.rows[0];
+          const cRes = await pool.query('SELECT id, name, code, address FROM centres WHERE id = $1', [centreId]);
+          if (cRes.rows.length > 0) centreObj = cRes.rows[0];
+        } catch (uErr) {
+          console.warn('[SMS] Could not query farmer/centre details for gate check-in SMS:', uErr.message);
+        }
+      } else {
+        farmerUser = inMemoryStore.users.find(u => u.id === booking.farmer_id);
+        centreObj = inMemoryStore.centres.find(c => c.id === centreId);
+      }
+
+      // Dispatch Gate Admission SMS asynchronously (guaranteed non-blocking)
+      sendGateAdmissionSms({
+        booking,
+        farmer: farmerUser,
+        centre: centreObj,
+      }).catch(smsErr => {
+        console.error('[SMS-SERVICE] Unhandled error during Gate Admission SMS dispatch:', smsErr.message);
+      });
+
       return res.json({
         success: true,
         message: `Token #${booking.token_number} successfully checked in at Gate!`,
@@ -303,6 +331,29 @@ router.post(
       });
 
       broadcastQueueUpdate(centreId);
+
+      // Fetch registered farmer profile for station call SMS notification
+      let farmerUser = null;
+      if (!isUsingMockStore && pool) {
+        try {
+          const fRes = await pool.query('SELECT id, full_name, phone FROM users WHERE id = $1', [booking.farmer_id]);
+          if (fRes.rows.length > 0) farmerUser = fRes.rows[0];
+        } catch (uErr) {
+          console.warn('[SMS] Could not query farmer details for gate call SMS:', uErr.message);
+        }
+      } else {
+        farmerUser = inMemoryStore.users.find(u => u.id === booking.farmer_id);
+      }
+
+      // Dispatch Gate Call SMS asynchronously
+      sendGateCallSms({
+        booking,
+        farmer: farmerUser,
+        stationName: booking.current_station,
+        deskNumber,
+      }).catch(smsErr => {
+        console.error('[SMS-SERVICE] Unhandled error during Gate Call SMS dispatch:', smsErr.message);
+      });
 
       return res.json({
         success: true,

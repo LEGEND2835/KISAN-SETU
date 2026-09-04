@@ -2,6 +2,7 @@ import express from 'express';
 import { inMemoryStore, isUsingMockStore, pool } from '../db/index.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { broadcastQueueUpdate } from '../sockets/queueSocket.js';
+import { sendBookingConfirmationSms } from '../services/smsService.js';
 
 const router = express.Router();
 
@@ -279,6 +280,37 @@ router.post('/book', authenticateToken, async (req, res) => {
 
     // Broadcast realtime update to Mandi Officer and Queue Screens
     broadcastQueueUpdate(centre_id);
+
+    // Retrieve fresh farmer profile (phone number & name) from database for SMS
+    let farmerUser = null;
+    if (!isUsingMockStore && pool) {
+      try {
+        const userRes = await pool.query('SELECT id, phone, full_name FROM users WHERE id = $1', [req.user.id]);
+        if (userRes.rows.length > 0) farmerUser = userRes.rows[0];
+      } catch (uErr) {
+        console.warn('[SMS] Could not query farmer user record:', uErr.message);
+      }
+    } else {
+      farmerUser = inMemoryStore.users.find(u => u.id === req.user.id);
+    }
+
+    if (!farmerUser) {
+      farmerUser = {
+        id: req.user.id,
+        phone: req.user.phone,
+        full_name: req.user.name || req.user.full_name || 'Farmer',
+      };
+    }
+
+    // Trigger SMS confirmation asynchronously (guaranteed not to throw or fail booking)
+    sendBookingConfirmationSms({
+      booking: newBooking,
+      farmer: farmerUser,
+      centre,
+      slot,
+    }).catch(smsErr => {
+      console.error('[SMS-SERVICE] Unhandled error during SMS dispatch:', smsErr.message);
+    });
 
     return res.status(201).json({
       success: true,
