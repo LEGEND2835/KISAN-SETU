@@ -139,7 +139,7 @@ export default function Navbar({ onOpenAiModal }) {
             )}
 
             <Link
-              to="/display/ctr_karnal_01"
+              to="/display"
               target="_blank"
               className="px-2.5 py-1.5 2xl:px-3 2xl:py-2 rounded-xl text-xs 2xl:text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/70 border border-transparent transition-all whitespace-nowrap flex items-center gap-1.5"
               title="Open Fullscreen Gate TV Board"
@@ -379,7 +379,7 @@ export default function Navbar({ onOpenAiModal }) {
             )}
 
             <Link
-              to="/display/ctr_karnal_01"
+              to="/display"
               target="_blank"
               onClick={() => setMobileMenuOpen(false)}
               className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-800"

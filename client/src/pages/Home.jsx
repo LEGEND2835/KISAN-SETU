@@ -268,7 +268,7 @@ export default function Home({ onOpenAiModal }) {
             </p>
           </div>
           <Link
-            to="/display/ctr_karnal_01"
+            to="/display"
             target="_blank"
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-400 hover:text-sky-300 bg-sky-500/10 px-3 py-1.5 rounded-lg border border-sky-500/20"
           >

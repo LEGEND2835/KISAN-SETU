@@ -32,7 +32,7 @@ export default function Footer() {
               <li><a href="/book-slot" className="hover:text-kisan-400 transition-colors">Farmer Slot Booking</a></li>
               <li><a href="/my-bookings" className="hover:text-kisan-400 transition-colors">Digital Passes & J-Form</a></li>
               <li><a href="/centre/officer" className="hover:text-kisan-400 transition-colors">Mandi Officer Control Center</a></li>
-              <li><a href="/display/ctr_karnal_01" className="hover:text-kisan-400 transition-colors">Gate Big Screen TV Board</a></li>
+              <li><a href="/display" className="hover:text-kisan-400 transition-colors">Gate Big Screen TV Board</a></li>
             </ul>
           </div>
 

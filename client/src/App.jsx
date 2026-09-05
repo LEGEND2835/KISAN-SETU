@@ -24,7 +24,7 @@ function AppLayout() {
   const [aiModalOpen, setAiModalOpen] = useState(false);
 
   // Hide Navbar and Footer on the standalone Big Screen TV page
-  const isDisplayScreen = location.pathname.startsWith('/display/');
+  const isDisplayScreen = location.pathname.startsWith('/display');
 
   return (
     <div className="min-h-screen flex flex-col justify-between selection:bg-kisan-500 selection:text-white">
@@ -74,6 +74,7 @@ function AppLayout() {
               </ProtectedRoute>
             }
           />
+          <Route path="/display" element={<PublicMandiDisplay />} />
           <Route path="/display/:centreId" element={<PublicMandiDisplay />} />
           <Route path="/login" element={<Login />} />
           <Route path="/analytics" element={<MandiAnalytics />} />
