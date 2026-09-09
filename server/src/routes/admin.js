@@ -779,6 +779,19 @@ router.put('/slots/:slotId', async (req, res) => {
     const { slotId } = req.params;
     const { max_capacity_quintals, max_tokens, status } = req.body;
 
+    if (max_capacity_quintals !== undefined) {
+      const capNum = Number(max_capacity_quintals);
+      if (typeof max_capacity_quintals === 'boolean' || max_capacity_quintals === '' || max_capacity_quintals === null || !Number.isFinite(capNum) || !Number.isInteger(capNum) || capNum <= 0) {
+        return res.status(400).json({ success: false, message: 'Max capacity quintals must be a finite positive integer.' });
+      }
+    }
+    if (max_tokens !== undefined) {
+      const tokNum = Number(max_tokens);
+      if (typeof max_tokens === 'boolean' || max_tokens === '' || max_tokens === null || !Number.isFinite(tokNum) || !Number.isInteger(tokNum) || tokNum <= 0) {
+        return res.status(400).json({ success: false, message: 'Max tokens must be a finite positive integer.' });
+      }
+    }
+
     let slot = null;
     if (!isUsingMockStore && pool) {
       await pool.query(`

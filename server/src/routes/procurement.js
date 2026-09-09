@@ -61,9 +61,25 @@ router.post(
       return res.status(400).json({ success: false, message: 'Rejection reason/remarks are mandatory when rejecting grain quality.' });
     }
 
-    const moisture = parseFloat(moisture_percentage || 12.0);
-    const foreign = parseFloat(foreign_matter_percentage || 1.0);
-    const damaged = parseFloat(damaged_grains_percentage || 0.5);
+    const moistureVal = moisture_percentage !== undefined ? moisture_percentage : 12.0;
+    const foreignVal = foreign_matter_percentage !== undefined ? foreign_matter_percentage : 1.0;
+    const damagedVal = damaged_grains_percentage !== undefined ? damaged_grains_percentage : 0.5;
+
+    const moistureNum = Number(moistureVal);
+    const foreignNum = Number(foreignVal);
+    const damagedNum = Number(damagedVal);
+
+    const isValidMoisture = typeof moistureVal !== 'boolean' && moistureVal !== '' && moistureVal !== null && Number.isFinite(moistureNum) && moistureNum >= 0 && moistureNum <= 100;
+    const isValidForeign = typeof foreignVal !== 'boolean' && foreignVal !== '' && foreignVal !== null && Number.isFinite(foreignNum) && foreignNum >= 0 && foreignNum <= 100;
+    const isValidDamaged = typeof damagedVal !== 'boolean' && damagedVal !== '' && damagedVal !== null && Number.isFinite(damagedNum) && damagedNum >= 0 && damagedNum <= 100;
+
+    if (!isValidMoisture || !isValidForeign || !isValidDamaged) {
+      return res.status(400).json({ success: false, message: 'Quality metrics (moisture, foreign matter, damaged grains) must be finite numbers from 0 through 100.' });
+    }
+
+    const moisture = moistureNum;
+    const foreign = foreignNum;
+    const damaged = damagedNum;
 
     // Quality Grading
     let grainGrade = 'FAQ';
@@ -298,8 +314,21 @@ router.post(
       });
     }
 
-    const gross = gross_weight_kg !== undefined ? parseFloat(gross_weight_kg) : (existingWeigh ? parseFloat(existingWeigh.gross_weight_kg) : 0);
-    const tare = tare_weight_kg !== undefined ? parseFloat(tare_weight_kg) : (existingWeigh ? parseFloat(existingWeigh.tare_weight_kg) : 0);
+    if (gross_weight_kg !== undefined) {
+      const gNum = Number(gross_weight_kg);
+      if (typeof gross_weight_kg === 'boolean' || gross_weight_kg === '' || gross_weight_kg === null || !Number.isFinite(gNum) || gNum < 0) {
+        return res.status(400).json({ success: false, message: 'Gross weight must be a finite number >= 0.' });
+      }
+    }
+    if (tare_weight_kg !== undefined) {
+      const tNum = Number(tare_weight_kg);
+      if (typeof tare_weight_kg === 'boolean' || tare_weight_kg === '' || tare_weight_kg === null || !Number.isFinite(tNum) || tNum < 0) {
+        return res.status(400).json({ success: false, message: 'Tare weight must be a finite number >= 0.' });
+      }
+    }
+
+    const gross = gross_weight_kg !== undefined ? Number(gross_weight_kg) : (existingWeigh ? parseFloat(existingWeigh.gross_weight_kg) : 0);
+    const tare = tare_weight_kg !== undefined ? Number(tare_weight_kg) : (existingWeigh ? parseFloat(existingWeigh.tare_weight_kg) : 0);
 
     const netKg = Math.max(0, gross - tare);
     const netQuintals = parseFloat((netKg / 100).toFixed(2));

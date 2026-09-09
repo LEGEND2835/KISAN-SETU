@@ -174,7 +174,11 @@ router.post('/book', authenticateToken, async (req, res) => {
       });
     }
 
-    const estQty = parseFloat(estimated_quantity_quintals);
+    const estQtyNum = Number(estimated_quantity_quintals);
+    if (typeof estimated_quantity_quintals === 'boolean' || estimated_quantity_quintals === '' || estimated_quantity_quintals === null || !Number.isFinite(estQtyNum) || estQtyNum <= 0) {
+      return res.status(400).json({ success: false, message: 'Estimated quantity must be a finite number greater than 0.' });
+    }
+    const estQty = estQtyNum;
 
     const vehicleCapMap = {
       'Bullock Cart': 30,
