@@ -450,7 +450,7 @@ router.post(
 });
 
 // 3. GET /api/procurement/receipt/:bookingId - Full digital J-Form receipt
-router.get('/receipt/:bookingId', async (req, res) => {
+router.get('/receipt/:bookingId', authenticateToken, async (req, res) => {
   try {
     const { bookingId } = req.params;
     let b = null;
@@ -494,6 +494,12 @@ router.get('/receipt/:bookingId', async (req, res) => {
       }
       b = dbRes.rows[0];
 
+      // Enforce ownership: owner or staff/admin
+      const isStaffOrAdmin = ['admin', 'centre_officer', 'quality_inspector', 'weighbridge_operator'].includes(req.user.role);
+      if (!isStaffOrAdmin && b.farmer_id !== req.user.id) {
+        return res.status(403).json({ success: false, message: 'Forbidden: You can only access your own procurement receipt.' });
+      }
+
       return res.json({
         success: true,
         receipt: {
@@ -533,6 +539,12 @@ router.get('/receipt/:bookingId', async (req, res) => {
       const booking = inMemoryStore.bookings.find(b => b.id === bookingId || b.token_number === bookingId);
       if (!booking) {
         return res.status(404).json({ success: false, message: 'Booking not found.' });
+      }
+
+      // Enforce ownership: owner or staff/admin
+      const isStaffOrAdmin = ['admin', 'centre_officer', 'quality_inspector', 'weighbridge_operator'].includes(req.user.role);
+      if (!isStaffOrAdmin && booking.farmer_id !== req.user.id) {
+        return res.status(403).json({ success: false, message: 'Forbidden: You can only access your own procurement receipt.' });
       }
 
       const farmer = inMemoryStore.users.find(u => u.id === booking.farmer_id);

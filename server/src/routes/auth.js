@@ -33,7 +33,7 @@ router.post('/register-farmer', async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password || 'farmer123', 8);
     const userId = `usr_${Date.now()}`;
-    const userRole = role || 'farmer';
+    const userRole = 'farmer';
     const email = `${phone}@${userRole}.kisansetu.gov.in`;
 
     const newUser = {

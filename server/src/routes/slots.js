@@ -398,7 +398,7 @@ router.get('/my', authenticateToken, async (req, res) => {
 });
 
 // GET /api/bookings/:id - Single booking pass details
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     let bookingData = null;
@@ -435,6 +435,12 @@ router.get('/:id', async (req, res) => {
 
       const b = dbRes.rows[0];
 
+      // Enforce ownership: owner or staff/admin
+      const isStaffOrAdmin = ['admin', 'centre_officer', 'quality_inspector', 'weighbridge_operator'].includes(req.user.role);
+      if (!isStaffOrAdmin && b.farmer_id !== req.user.id) {
+        return res.status(403).json({ success: false, message: 'Forbidden: Access denied to another farmer\'s booking pass.' });
+      }
+
       // Calculate queue position ahead
       const aheadRes = await pool.query(
         `SELECT COUNT(*) as count FROM bookings 
@@ -458,6 +464,12 @@ router.get('/:id', async (req, res) => {
       const booking = inMemoryStore.bookings.find(b => b.id === id || b.token_number === id);
       if (!booking) {
         return res.status(404).json({ success: false, message: 'Booking not found.' });
+      }
+
+      // Enforce ownership: owner or staff/admin
+      const isStaffOrAdmin = ['admin', 'centre_officer', 'quality_inspector', 'weighbridge_operator'].includes(req.user.role);
+      if (!isStaffOrAdmin && booking.farmer_id !== req.user.id) {
+        return res.status(403).json({ success: false, message: 'Forbidden: Access denied to another farmer\'s booking pass.' });
       }
 
       const centre = inMemoryStore.centres.find(c => c.id === booking.centre_id);
@@ -512,6 +524,12 @@ router.post('/:id/cancel', authenticateToken, async (req, res) => {
       }
       const b = bRes.rows[0];
 
+      // Enforce ownership: owner or staff/admin
+      const isStaffOrAdmin = ['admin', 'centre_officer', 'quality_inspector', 'weighbridge_operator'].includes(req.user.role);
+      if (!isStaffOrAdmin && b.farmer_id !== req.user.id) {
+        return res.status(403).json({ success: false, message: 'Forbidden: You can only cancel your own booking.' });
+      }
+
       if (b.status !== 'BOOKED') {
         return res.status(400).json({
           success: false,
@@ -532,6 +550,13 @@ router.post('/:id/cancel', authenticateToken, async (req, res) => {
       if (!booking) {
         return res.status(404).json({ success: false, message: 'Booking not found.' });
       }
+
+      // Enforce ownership: owner or staff/admin
+      const isStaffOrAdmin = ['admin', 'centre_officer', 'quality_inspector', 'weighbridge_operator'].includes(req.user.role);
+      if (!isStaffOrAdmin && booking.farmer_id !== req.user.id) {
+        return res.status(403).json({ success: false, message: 'Forbidden: You can only cancel your own booking.' });
+      }
+
       if (booking.status !== 'BOOKED') {
         return res.status(400).json({
           success: false,

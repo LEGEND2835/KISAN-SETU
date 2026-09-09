@@ -6,18 +6,28 @@ import { sendGateAdmissionSms, sendGateCallSms } from '../services/notifications
 
 const router = express.Router();
 
-// Helper to format booking objects
+// Helper to format booking objects for public live queue (privacy-safe)
 function formatBooking(b) {
+  const phone = b.farmer_phone || '';
+  const maskedPhone = phone.length >= 4 ? `${phone.slice(0, 2)}******${phone.slice(-2)}` : '';
+  const { qr_code_hash, ...rest } = b;
+
+  let sanitizedPayment = null;
+  if (b.payment_info) {
+    const { bank_account_last4, ifsc_code, transaction_ref, ...payRest } = b.payment_info;
+    sanitizedPayment = payRest;
+  }
+
   return {
-    ...b,
+    ...rest,
     farmer_name: b.farmer_name || 'Registered Farmer',
-    farmer_phone: b.farmer_phone || '',
-    slot_time: b.start_time ? `${b.start_time} - ${b.end_time}` : '',
+    farmer_phone: maskedPhone,
+    slot_time: b.start_time ? `${b.start_time} - ${b.end_time}` : (b.slot_time || ''),
     rejection_stage: b.rejection_stage || null,
     rejection_reason: b.rejection_reason || null,
     quality_check: b.quality_check || null,
     weighbridge_log: b.weighbridge_log || null,
-    payment_info: b.payment_info || null,
+    payment_info: sanitizedPayment,
   };
 }
 
@@ -62,7 +72,7 @@ router.get('/:centreId/live', async (req, res) => {
         const weighbridge = inMemoryStore.weighbridge_logs.find(w => w.booking_id === b.id);
         const payment = inMemoryStore.payments.find(p => p.booking_id === b.id);
         const slot = inMemoryStore.slots.find(s => s.id === b.slot_id);
-        return {
+        return formatBooking({
           ...b,
           farmer_name: farmer ? farmer.full_name : 'Registered Farmer',
           farmer_phone: farmer ? farmer.phone : '',
@@ -72,7 +82,7 @@ router.get('/:centreId/live', async (req, res) => {
           quality_check: quality || null,
           weighbridge_log: weighbridge || null,
           payment_info: payment || null,
-        };
+        });
       });
     }
 

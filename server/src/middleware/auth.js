@@ -1,6 +1,12 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'sih_2026_kisansetu_super_secret_jwt_key_9876543210';
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('FATAL SECURITY ERROR: JWT_SECRET environment variable is missing.');
+  }
+  return secret;
+}
 
 export function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -10,13 +16,19 @@ export function authenticateToken(req, res, next) {
     return res.status(401).json({ success: false, message: 'Access token required. Please login.' });
   }
 
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ success: false, message: 'Invalid or expired session token.' });
-    }
-    req.user = user;
-    next();
-  });
+  try {
+    const secret = getJwtSecret();
+    jwt.verify(token, secret, (err, user) => {
+      if (err) {
+        return res.status(401).json({ success: false, message: 'Invalid or expired session token.' });
+      }
+      req.user = user;
+      next();
+    });
+  } catch (err) {
+    console.error('JWT Error:', err.message);
+    return res.status(500).json({ success: false, message: 'Internal server configuration error.' });
+  }
 }
 
 export function authorizeRoles(...allowedRoles) {
@@ -32,5 +44,7 @@ export function authorizeRoles(...allowedRoles) {
 }
 
 export function generateToken(payload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' });
 }
+
+
