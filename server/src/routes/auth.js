@@ -10,8 +10,8 @@ router.post('/register-farmer', async (req, res) => {
   try {
     const { full_name, phone, state, district, village, aadhaar_last4, bank_account_last4, ifsc_code, password, role } = req.body;
 
-    if (!full_name || !phone || !state || !district) {
-      return res.status(400).json({ success: false, message: 'Name, phone, state, and district are required.' });
+    if (!full_name || !phone || !state || !district || !password || !password.trim()) {
+      return res.status(400).json({ success: false, message: 'Name, phone, state, district, and password are required.' });
     }
 
     let existingUser = null;
@@ -31,7 +31,7 @@ router.post('/register-farmer', async (req, res) => {
       });
     }
 
-    const passwordHash = await bcrypt.hash(password || 'farmer123', 8);
+    const passwordHash = await bcrypt.hash(password.trim(), 8);
     const userId = `usr_${Date.now()}`;
     const userRole = 'farmer';
     const email = `${phone}@${userRole}.kisansetu.gov.in`;
@@ -119,7 +119,7 @@ router.post('/login', async (req, res) => {
 
     // Password verification
     const isMatch = password ? await bcrypt.compare(password, user.password_hash) : false;
-    if (!isMatch && password !== 'farmer123' && password !== 'admin123') {
+    if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Invalid phone or password.' });
     }
 

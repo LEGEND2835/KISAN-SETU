@@ -65,7 +65,7 @@ export default function AdminDashboard() {
     full_name: '',
     phone: '',
     role: 'centre_officer',
-    password: 'admin123',
+    password: '',
     designation: 'Mandi Supervisor',
     centre_id: '',
     state: 'Haryana',
@@ -256,7 +256,7 @@ export default function AdminDashboard() {
           full_name: '',
           phone: '',
           role: 'centre_officer',
-          password: 'admin123',
+          password: '',
           designation: 'Mandi Supervisor',
           centre_id: '',
           state: 'Haryana',
@@ -500,13 +500,13 @@ export default function AdminDashboard() {
                 setActiveTab('MANDIS');
                 setShowAddCentreModal(true);
               }}
-              className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 hover:border-amber-500/50 text-left transition-all group"
+              className="p-5 rounded-2xl bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-950 border border-slate-200 dark:border-slate-800 hover:border-amber-500/50 shadow-sm dark:shadow-none text-left transition-all group"
             >
               <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Plus className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-white text-base">Add New Mandi Centre</h3>
-              <p className="text-xs text-slate-400 mt-1">Configure yard capacity, truck bays, and auto 7-day slot generation.</p>
+              <h3 className="font-bold text-slate-900 dark:text-white text-base">Add New Mandi Centre</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Configure yard capacity, truck bays, and auto 7-day slot generation.</p>
             </button>
 
             <button
@@ -514,35 +514,35 @@ export default function AdminDashboard() {
                 setActiveTab('OFFICERS');
                 setShowAddOfficerModal(true);
               }}
-              className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 hover:border-emerald-500/50 text-left transition-all group"
+              className="p-5 rounded-2xl bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-950 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 shadow-sm dark:shadow-none text-left transition-all group"
             >
               <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Users className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-white text-base">Register Officer / Staff</h3>
-              <p className="text-xs text-slate-400 mt-1">Onboard supervisors, lab quality analysts, and weighbridge operators.</p>
+              <h3 className="font-bold text-slate-900 dark:text-white text-base">Register Officer / Staff</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Onboard supervisors, lab quality analysts, and weighbridge operators.</p>
             </button>
 
             <button
               onClick={() => setActiveTab('FARMERS')}
-              className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 hover:border-sky-500/50 text-left transition-all group"
+              className="p-5 rounded-2xl bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-950 border border-slate-200 dark:border-slate-800 hover:border-sky-500/50 shadow-sm dark:shadow-none text-left transition-all group"
             >
               <div className="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Search className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-white text-base">Search Farmer Directory</h3>
-              <p className="text-xs text-slate-400 mt-1">Inspect KYC profiles, registered Aadhaar, IFSC accounts & sales.</p>
+              <h3 className="font-bold text-slate-900 dark:text-white text-base">Search Farmer Directory</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Inspect KYC profiles, registered Aadhaar, IFSC accounts & sales.</p>
             </button>
 
             <button
               onClick={() => setActiveTab('SLOTS')}
-              className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 hover:border-purple-500/50 text-left transition-all group"
+              className="p-5 rounded-2xl bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-950 border border-slate-200 dark:border-slate-800 hover:border-purple-500/50 shadow-sm dark:shadow-none text-left transition-all group"
             >
               <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Clock className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-white text-base">Configure Slot Capacity</h3>
-              <p className="text-xs text-slate-400 mt-1">Adjust 2-hour window quotas, pause booking, or set holiday blackouts.</p>
+              <h3 className="font-bold text-slate-900 dark:text-white text-base">Configure Slot Capacity</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Adjust 2-hour window quotas, pause booking, or set holiday blackouts.</p>
             </button>
           </div>
 
@@ -729,7 +729,7 @@ export default function AdminDashboard() {
                   full_name: '',
                   phone: '',
                   role: 'centre_officer',
-                  password: 'admin123',
+                  password: '',
                   designation: 'Mandi Supervisor',
                   centre_id: centres[0]?.id || '',
                   state: 'Haryana',
@@ -1331,12 +1331,14 @@ export default function AdminDashboard() {
 
               {showAddOfficerModal && (
                 <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Default Password</label>
+                  <label className="block font-semibold text-slate-300 mb-1">Temporary Password</label>
                   <input
                     type="password"
                     value={officerForm.password}
                     onChange={(e) => setOfficerForm({ ...officerForm, password: e.target.value })}
+                    placeholder="Set temporary password"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                    required
                   />
                 </div>
               )}

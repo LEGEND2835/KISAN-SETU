@@ -12,7 +12,7 @@ export default function Login() {
 
   const [isRegister, setIsRegister] = useState(false);
   const [phone, setPhone] = useState('9876543210');
-  const [password, setPassword] = useState('farmer123');
+  const [password, setPassword] = useState('');
   const [role, setRole] = useState('farmer');
 
   // Register Form States

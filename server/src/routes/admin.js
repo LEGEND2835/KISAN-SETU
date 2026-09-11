@@ -367,8 +367,8 @@ router.post('/officers', async (req, res) => {
   try {
     const { full_name, phone, role, password, designation, centre_id, state, district } = req.body;
 
-    if (!full_name || !phone || !role) {
-      return res.status(400).json({ success: false, message: 'Name, phone, and role are required.' });
+    if (!full_name || !phone || !role || !password || !password.trim()) {
+      return res.status(400).json({ success: false, message: 'Name, phone, role, and password are required.' });
     }
 
     const validRoles = ['centre_officer', 'quality_inspector', 'weighbridge_operator', 'admin'];
@@ -389,7 +389,7 @@ router.post('/officers', async (req, res) => {
       }
     }
 
-    const passwordHash = await bcrypt.hash(password || 'admin123', 8);
+    const passwordHash = await bcrypt.hash(password.trim(), 8);
     const officerId = `usr_${role.slice(0, 3)}_${Date.now().toString().slice(-6)}`;
     const email = `${phone.trim()}@${role}.kisansetu.gov.in`;
 
