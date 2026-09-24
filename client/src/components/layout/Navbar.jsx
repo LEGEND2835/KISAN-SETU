@@ -18,14 +18,18 @@ import {
   ChevronRight,
   Sparkles,
   Check,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { useAuth, DEMO_PROFILES } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function Navbar({ onOpenAiModal }) {
   const { user, logout, quickSwitchProfile, isStaff } = useAuth();
   const { lang, setLanguage, languages, t } = useLanguage();
+  const { theme, toggleTheme, isDark } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -176,6 +180,26 @@ export default function Navbar({ onOpenAiModal }) {
               </span>
               <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 group-hover:scale-110 transition-transform shrink-0" />
               <span className="hidden md:inline whitespace-nowrap text-xs 2xl:text-sm">{t('cta_ai_help')}</span>
+            </button>
+
+            {/* Light / Dark Theme Mode Toggle */}
+            <button
+              onClick={toggleTheme}
+              className="px-2 py-1.5 sm:px-2.5 sm:py-2 rounded-xl bg-slate-800/90 border border-slate-700 text-slate-200 text-xs sm:text-sm font-semibold flex items-center gap-1 hover:bg-slate-700 hover:border-slate-600 transition-all shrink-0 shadow-sm"
+              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              aria-label="Toggle Theme Mode"
+            >
+              {isDark ? (
+                <>
+                  <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
+                  <span className="hidden sm:inline font-medium whitespace-nowrap text-xs sm:text-sm">Light</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-400 shrink-0" />
+                  <span className="hidden sm:inline font-medium whitespace-nowrap text-xs sm:text-sm">Dark</span>
+                </>
+              )}
             </button>
 
             {/* Language Selector Dropdown */}
@@ -439,6 +463,29 @@ export default function Navbar({ onOpenAiModal }) {
                 </Link>
               </div>
             )}
+
+            {/* Mobile Theme Toggle */}
+            <div className="pt-2 border-t border-slate-800">
+              <button
+                onClick={() => {
+                  toggleTheme();
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium bg-slate-800/80 border border-slate-700 text-slate-200 transition-colors"
+              >
+                <div className="flex items-center gap-2.5">
+                  {isDark ? (
+                    <Sun className="w-4 h-4 text-amber-400" />
+                  ) : (
+                    <Moon className="w-4 h-4 text-sky-400" />
+                  )}
+                  <span>{isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}</span>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-700 text-slate-300 uppercase">
+                  {theme}
+                </span>
+              </button>
+            </div>
 
             {/* Mobile Demo Role Picker */}
             <div className="pt-3 border-t border-slate-800/80">

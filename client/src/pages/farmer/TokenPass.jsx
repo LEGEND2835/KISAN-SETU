@@ -400,9 +400,34 @@ export default function TokenPass() {
 
       {/* 3. J-Form Receipt Modal & Clean Printable e-J-Form Document */}
       {showReceiptModal && receiptData && (
-        <div className="printable-jform-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in print:p-0 print:static">
-          <div className="printable-jform-doc w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto print:max-h-none print:border-2 print:border-emerald-700 print:bg-white print:p-6">
+        <div className="printable-jform-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in print:p-0 print:static print:bg-white print:backdrop-blur-none">
+          <div className="printable-jform-doc w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto print:max-h-none print:border-2 print:border-emerald-700 print:bg-white print:p-6 print:shadow-none print:rounded-lg">
             
+            {/* Top Modal Controls (Screen Only) */}
+            <div className="flex items-center justify-between no-print print:hidden pb-2 border-b border-slate-800">
+              <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-emerald-400" /> Official J-Form Certificate Preview
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm shadow-emerald-600/30"
+                  title="Print / Save as PDF"
+                >
+                  <Printer className="w-3.5 h-3.5" /> Print / Download (PDF)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowReceiptModal(false)}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-xs font-semibold transition-colors"
+                  title="Close receipt preview"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
             {/* J-Form Printable Header */}
             <div className="text-center border-b border-slate-800 pb-4 space-y-1 print:border-slate-300 print:pb-3">
               <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/30 print:text-emerald-800 print:border-emerald-600 print:bg-emerald-50">
@@ -412,10 +437,18 @@ export default function TokenPass() {
               <h2 className="text-xl sm:text-2xl font-black text-white pt-2 print:text-slate-900">
                 e-Procurement Certificate (J-Form)
               </h2>
-              <div className="flex items-center justify-center gap-4 text-xs text-slate-400 pt-1 print:text-slate-600">
-                <span>Receipt Number: <strong className="font-mono text-white print:text-slate-900">{receiptData.receipt_number}</strong></span>
+              <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-slate-400 pt-1 print:text-slate-700">
+                <span>Receipt No: <strong className="font-mono text-white print:text-slate-900">{receiptData.receipt_number}</strong></span>
+                <span>•</span>
+                <span>Token No: <strong className="font-mono text-amber-300 print:text-slate-900 font-bold">{receiptData.procurement_details?.token_number || booking.token_number}</strong></span>
                 <span>•</span>
                 <span>Date: <strong className="text-slate-200 print:text-slate-900">{new Date(receiptData.generated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong></span>
+                {receiptData.procurement_details?.transaction_ref && (
+                  <>
+                    <span>•</span>
+                    <span>DBT Ref: <strong className="font-mono text-emerald-400 print:text-slate-900 font-bold">{receiptData.procurement_details.transaction_ref}</strong></span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -427,6 +460,11 @@ export default function TokenPass() {
                 {receiptData.farmer.phone && <p className="text-slate-400 font-mono print:text-slate-700">Mobile: {receiptData.farmer.phone}</p>}
                 <p className="text-slate-400 print:text-slate-700">Aadhaar: **** {receiptData.farmer.aadhaar_last4}</p>
                 <p className="text-slate-400 print:text-slate-700">Bank A/c: **** {receiptData.farmer.bank_account_last4} ({receiptData.farmer.ifsc_code})</p>
+                {(receiptData.procurement_details?.vehicle_number || booking.vehicle_number) && (
+                  <p className="text-slate-400 print:text-slate-700 font-mono">
+                    Vehicle: {receiptData.procurement_details?.vehicle_number || booking.vehicle_number} ({receiptData.procurement_details?.vehicle_type || booking.vehicle_type})
+                  </p>
+                )}
               </div>
 
               <div>
@@ -501,18 +539,20 @@ export default function TokenPass() {
             </div>
 
             {/* Interactive Modal Actions (Hidden on Print) */}
-            <div className="flex items-center justify-between pt-2 no-print">
+            <div className="flex items-center justify-between pt-2 no-print print:hidden">
               <button
+                type="button"
                 onClick={() => setShowReceiptModal(false)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
               >
                 Close
               </button>
               <button
+                type="button"
                 onClick={() => window.print()}
-                className="px-5 py-2 rounded-xl bg-kisan-600 hover:bg-kisan-500 text-white text-xs font-bold flex items-center gap-1.5"
+                className="px-5 py-2.5 rounded-xl bg-kisan-600 hover:bg-kisan-500 text-white text-xs font-bold flex items-center gap-2 transition-all shadow-lg shadow-kisan-600/30"
               >
-                <Printer className="w-4 h-4" /> Download / Print Official J-Form
+                <Printer className="w-4 h-4" /> Print / Download Official J-Form (PDF)
               </button>
             </div>
 

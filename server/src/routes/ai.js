@@ -1,12 +1,24 @@
 import express from 'express';
 import { inMemoryStore, isUsingMockStore, pool } from '../db/index.js';
+import {
+  calculateCostMatrix,
+  calculateTimeMatrix,
+  generateRecommendationExplanation,
+} from '../config/costConfig.js';
 
 const router = express.Router();
 
-// 1. Smart Slot & Mandi Recommendation
-router.post('/recommend-slot', async (req, res) => {
+// Handler for Smart Slot & Mandi Recommendation (supports Cost & Time Matrix)
+async function handleSlotRecommendation(req, res) {
   try {
-    const { crop_name, quantity_quintals, preferred_date } = req.body;
+    const {
+      crop_name,
+      quantity_quintals,
+      preferred_date,
+      vehicle_type = 'Tractor Trolley',
+      distance_km,
+    } = req.body || {};
+
     const targetDate = preferred_date || new Date().toISOString().split('T')[0];
 
     let centresList = [];
@@ -25,15 +37,15 @@ router.post('/recommend-slot', async (req, res) => {
 
         if (!isUsingMockStore && pool) {
           const qCountRes = await pool.query(
-            `SELECT COUNT(*) as active_count FROM bookings 
+            `SELECT COUNT(*) as active_count FROM bookings
              WHERE centre_id = $1 AND status IN ('CHECKED_IN', 'CALLED', 'QUALITY_INSPECTION', 'WEIGHING', 'UNLOADING')`,
             [centre.id]
           );
           queueCongestion = parseInt(qCountRes.rows[0]?.active_count || '0', 10);
 
           const slotsRes = await pool.query(
-            `SELECT * FROM slots 
-             WHERE centre_id = $1 AND slot_date = $2 AND status = 'OPEN' 
+            `SELECT * FROM slots
+             WHERE centre_id = $1 AND slot_date = $2 AND status = 'OPEN'
              ORDER BY (booked_tokens::float / NULLIF(max_tokens, 0)) ASC LIMIT 1`,
             [centre.id, targetDate]
           );
@@ -49,10 +61,43 @@ router.post('/recommend-slot', async (req, res) => {
           bestSlot = [...slots].sort((a, b) => (a.booked_tokens / a.max_tokens) - (b.booked_tokens / b.max_tokens))[0] || null;
         }
 
-        const estimatedWaitMins = queueCongestion * 12 + 10;
+        // 1. Time Matrix Calculation (Vehicle handling + Queue wait + Gate clearance)
+        const timeMatrix = calculateTimeMatrix({
+          vehicleType: vehicle_type,
+          queueCongestion,
+        });
+
+        // 2. Cost Matrix Calculation (Vehicle mobilization + Freight + Mandi handling charges)
+        const costMatrix = calculateCostMatrix({
+          vehicleType: vehicle_type,
+          distanceKm: distance_km,
+          quantityQuintals: quantity_quintals,
+        });
+
+        // 3. Recommendation Scoring (Preserving congestion/capacity dominance with subtle turnaround bonus/penalty)
         const congestionPenalty = Math.min(50, queueCongestion * 5);
         const capacityBonus = parseInt(centre.daily_capacity_quintals || '5000', 10) > 7000 ? 15 : 5;
-        const score = Math.max(10, Math.round(85 - congestionPenalty + capacityBonus));
+        let score = 85 - congestionPenalty + capacityBonus;
+
+        // Modest score adjustment based on turnaround efficiency and cost (< 10% weight)
+        if (timeMatrix.estimatedTotalMinutes <= 30) {
+          score += 5;
+        } else if (timeMatrix.estimatedTotalMinutes >= 60) {
+          score -= 5;
+        }
+
+        score = Math.max(10, Math.min(99, Math.round(score)));
+
+        // 4. Explainable justification
+        const explanation = generateRecommendationExplanation({
+          queueCongestion,
+          estimatedWaitMinutes: timeMatrix.estimatedWaitMinutes,
+          estimatedProcessingMinutes: timeMatrix.estimatedProcessingMinutes,
+          estimatedTotalMinutes: timeMatrix.estimatedTotalMinutes,
+          estimatedTotalCost: costMatrix.estimatedTotalCost,
+          vehicleType: costMatrix.vehicleType,
+          score,
+        });
 
         const occPct = bestSlot ? Math.round((parseInt(bestSlot.booked_tokens || '0', 10) / parseInt(bestSlot.max_tokens || '25', 10)) * 100) : 0;
 
@@ -68,12 +113,56 @@ router.post('/recommend-slot', async (req, res) => {
             time: `${bestSlot.start_time} - ${bestSlot.end_time}`,
             occupancy_percentage: occPct,
             congestion_color: occPct > 70 ? 'YELLOW' : 'GREEN',
+            estimatedCost: costMatrix.estimatedTotalCost,
+            estimatedTransportCost: costMatrix.estimatedTransportCost,
+            estimatedMandiCost: costMatrix.estimatedMandiCost,
+            estimatedWaitMinutes: timeMatrix.estimatedWaitMinutes,
+            estimatedProcessingMinutes: timeMatrix.estimatedProcessingMinutes,
+            estimatedTotalMinutes: timeMatrix.estimatedTotalMinutes,
+            human_readable: {
+              wait_text: timeMatrix.estimatedWaitText,
+              processing_text: timeMatrix.estimatedProcessingText,
+              total_text: timeMatrix.estimatedTotalText,
+              cost_text: costMatrix.totalCostFormatted,
+            },
           } : null,
           congestion_level: queueCongestion > 8 ? 'HIGH' : queueCongestion > 4 ? 'MODERATE' : 'LOW',
           active_trucks_in_queue: queueCongestion,
-          estimated_wait_time_minutes: estimatedWaitMins,
+          estimated_wait_time_minutes: timeMatrix.estimatedWaitMinutes,
           recommendation_score: score,
           ai_tag: score >= 80 ? '⭐ Best Match (Fastest Turnaround)' : score >= 65 ? '👍 Recommended' : '⚠️ Heavy Rush Expected',
+
+          // Cost Matrix Outputs (both camelCase and snake_case for universal compatibility)
+          estimatedCost: costMatrix.estimatedTotalCost,
+          estimatedTransportCost: costMatrix.estimatedTransportCost,
+          estimatedMandiCost: costMatrix.estimatedMandiCost,
+          estimated_cost: costMatrix.estimatedTotalCost,
+          estimated_transport_cost: costMatrix.estimatedTransportCost,
+          estimated_mandi_cost: costMatrix.estimatedMandiCost,
+
+          // Time Matrix Outputs
+          estimatedWaitMinutes: timeMatrix.estimatedWaitMinutes,
+          estimatedProcessingMinutes: timeMatrix.estimatedProcessingMinutes,
+          estimatedTotalMinutes: timeMatrix.estimatedTotalMinutes,
+          estimated_wait_minutes: timeMatrix.estimatedWaitMinutes,
+          estimated_processing_minutes: timeMatrix.estimatedProcessingMinutes,
+          estimated_total_minutes: timeMatrix.estimatedTotalMinutes,
+
+          // Formatted human-readable summaries
+          human_readable: {
+            wait_text: timeMatrix.estimatedWaitText,
+            processing_text: timeMatrix.estimatedProcessingText,
+            total_text: timeMatrix.estimatedTotalText,
+            cost_text: costMatrix.totalCostFormatted,
+          },
+
+          // Detailed breakdowns & assumptions
+          cost_breakdown: costMatrix,
+          time_breakdown: timeMatrix,
+
+          // AI-assisted explainability
+          ai_explanation: explanation,
+          explanation: explanation,
         };
       })
     );
@@ -89,7 +178,11 @@ router.post('/recommend-slot', async (req, res) => {
     console.error('AI Recommendation Error:', error);
     return res.status(500).json({ success: false, message: 'Failed to compute slot recommendations.' });
   }
-});
+}
+
+// Support both /recommend-slot and /recommend
+router.post('/recommend-slot', handleSlotRecommendation);
+router.post('/recommend', handleSlotRecommendation);
 
 // 2. Dynamic Wait Time Prediction Engine
 router.get('/predict-wait-time/:bookingId', async (req, res) => {
@@ -115,9 +208,9 @@ router.get('/predict-wait-time/:bookingId', async (req, res) => {
       }
 
       const countRes = await pool.query(
-        `SELECT COUNT(*) as count FROM bookings 
-         WHERE centre_id = $1 
-           AND status IN ('CHECKED_IN', 'CALLED', 'QUALITY_INSPECTION', 'WEIGHING', 'UNLOADING') 
+        `SELECT COUNT(*) as count FROM bookings
+         WHERE centre_id = $1
+           AND status IN ('CHECKED_IN', 'CALLED', 'QUALITY_INSPECTION', 'WEIGHING', 'UNLOADING')
            AND created_at < $2`,
         [booking.centre_id, booking.created_at]
       );

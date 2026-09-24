@@ -5,14 +5,14 @@
 @layer base {
   body {
     @apply bg-[#0b0f19] text-slate-100 min-h-screen font-sans;
-    background-image: 
+    background-image:
       radial-gradient(at 0% 0%, rgba(39, 98, 37, 0.15) 0px, transparent 50%),
       radial-gradient(at 100% 100%, rgba(217, 119, 6, 0.12) 0px, transparent 50%);
     background-attachment: fixed;
   }
 }
 
-/* Glassmorphism card utilities */
+/* Glassmorphism card utilities - Dark Mode Default */
 .glass-panel {
   background: rgba(30, 41, 59, 0.7);
   backdrop-filter: blur(12px);
@@ -37,7 +37,7 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* Custom glowing badge styles */
+/* Custom glowing badge styles - Dark Mode Default */
 .badge-status {
   @apply px-2.5 py-1 rounded-full text-xs font-semibold tracking-wide inline-flex items-center gap-1.5;
 }
@@ -62,7 +62,7 @@
   @apply bg-rose-500/15 text-rose-400 border border-rose-500/30;
 }
 
-/* Custom scrollbars */
+/* Custom scrollbars - Dark Mode Default */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -79,6 +79,273 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 116, 139, 0.8);
+}
+
+/* ==========================================================================
+   LIGHT MODE THEME SYSTEM
+   Scoped strictly under html.light / [data-theme="light"]
+   ========================================================================== */
+html.light body,
+[data-theme="light"] body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(39, 98, 37, 0.07) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(217, 119, 6, 0.05) 0px, transparent 50%) !important;
+  background-attachment: fixed;
+}
+
+/* Light Mode Glassmorphism & Header */
+html.light .glass-header,
+[data-theme="light"] .glass-header {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light .glass-panel,
+[data-theme="light"] .glass-panel {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .glass-panel-hover:hover,
+[data-theme="light"] .glass-panel-hover:hover {
+  background: #ffffff !important;
+  border-color: rgba(63, 155, 59, 0.5) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Universal Light Mode Card & Container Backgrounds */
+html.light [class*="bg-slate-950"],
+html.light [class*="bg-slate-900"],
+html.light .bg-\[\#0b0f19\],
+html.light .bg-\[\#0f172a\],
+html.light .bg-\[\#1e293b\],
+html.light .bg-\[\#0d1322\],
+html.light .bg-\[\#131b2e\] {
+  background-color: #ffffff !important;
+}
+
+html.light [class*="bg-slate-800"] {
+  background-color: #f1f5f9 !important;
+}
+
+html.light [class*="bg-slate-700"] {
+  background-color: #e2e8f0 !important;
+}
+
+/* Universal Light Mode Borders */
+html.light [class*="border-slate-800"],
+html.light [class*="border-slate-700"],
+html.light [class*="border-slate-600"] {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .divide-slate-800 > :not([hidden]) ~ :not([hidden]),
+html.light .divide-slate-700 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #e2e8f0 !important;
+}
+
+/* Light Mode Typography & Text Colors */
+html.light .text-white:not(.bg-kisan-600 *):not(.bg-kisan-500 *):not(.bg-emerald-600 *):not(.bg-rose-600 *):not(.bg-amber-600 *):not(.bg-sky-600 *):not(.bg-purple-600 *):not([class*="bg-kisan-6"]):not([class*="bg-emerald-6"]):not([class*="bg-rose-6"]):not([class*="bg-amber-6"]):not([class*="bg-sky-6"]):not([class*="bg-purple-6"]) {
+  color: #0f172a;
+}
+
+html.light .text-slate-100,
+html.light .text-slate-200 {
+  color: #1e293b !important;
+}
+
+html.light .text-slate-300 {
+  color: #334155 !important;
+}
+
+html.light .text-slate-400 {
+  color: #64748b !important;
+}
+
+html.light .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Light Mode Accent Colors with High Contrast */
+html.light .text-kisan-300,
+html.light .text-kisan-400 {
+  color: #276225 !important;
+}
+
+html.light .text-amber-300,
+html.light .text-amber-400 {
+  color: #92400e !important;
+}
+
+html.light .text-emerald-300,
+html.light .text-emerald-400 {
+  color: #047857 !important;
+}
+
+html.light .text-sky-300,
+html.light .text-sky-400 {
+  color: #0369a1 !important;
+}
+
+html.light .text-purple-300,
+html.light .text-purple-400 {
+  color: #6b21a8 !important;
+}
+
+html.light .text-rose-300,
+html.light .text-rose-400 {
+  color: #be123c !important;
+}
+
+/* Light Mode Translucent Accent Badges & Buttons */
+html.light [class*="bg-kisan-600/"],
+html.light [class*="bg-kisan-500/"],
+html.light [class*="bg-kisan-950/"] {
+  background-color: rgba(63, 155, 59, 0.12) !important;
+  border-color: rgba(63, 155, 59, 0.35) !important;
+  color: #1e411e !important;
+}
+
+html.light [class*="bg-amber-500/"],
+html.light [class*="bg-amber-950/"] {
+  background-color: rgba(245, 158, 11, 0.12) !important;
+  border-color: rgba(245, 158, 11, 0.35) !important;
+  color: #78350f !important;
+}
+
+html.light [class*="bg-emerald-600/"],
+html.light [class*="bg-emerald-500/"] {
+  background-color: rgba(16, 185, 129, 0.12) !important;
+  border-color: rgba(16, 185, 129, 0.35) !important;
+  color: #065f46 !important;
+}
+
+html.light [class*="bg-sky-500/"],
+html.light [class*="bg-sky-600/"] {
+  background-color: rgba(14, 165, 233, 0.12) !important;
+  border-color: rgba(14, 165, 233, 0.35) !important;
+  color: #075985 !important;
+}
+
+html.light [class*="bg-purple-500/"],
+html.light [class*="bg-purple-600/"] {
+  background-color: rgba(168, 85, 247, 0.12) !important;
+  border-color: rgba(168, 85, 247, 0.35) !important;
+  color: #581c87 !important;
+}
+
+/* Light Mode Interactive & Hover States */
+html.light .hover\:bg-slate-800:hover,
+html.light .hover\:bg-slate-800\/70:hover,
+html.light .hover\:bg-slate-800\/60:hover,
+html.light .hover\:bg-slate-800\/50:hover,
+html.light .hover\:bg-slate-700:hover,
+html.light .hover\:bg-slate-700\/80:hover,
+html.light .hover\:bg-slate-900:hover {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+html.light .hover\:border-slate-600:hover,
+html.light .hover\:border-slate-500:hover {
+  border-color: #cbd5e1 !important;
+}
+
+/* Light Mode Inputs, Selects, and Textareas */
+html.light input:not([type="checkbox"]):not([type="radio"]),
+html.light select,
+html.light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+html.light input:focus,
+html.light select:focus,
+html.light textarea:focus {
+  border-color: #3f9b3b !important;
+  box-shadow: 0 0 0 2px rgba(63, 155, 59, 0.2) !important;
+  outline: none !important;
+}
+
+/* Light Mode Badges */
+html.light .badge-green {
+  background-color: rgba(16, 185, 129, 0.12) !important;
+  color: #047857 !important;
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
+
+html.light .badge-yellow {
+  background-color: rgba(245, 158, 11, 0.12) !important;
+  color: #b45309 !important;
+  border-color: rgba(245, 158, 11, 0.35) !important;
+}
+
+html.light .badge-blue {
+  background-color: rgba(14, 165, 233, 0.12) !important;
+  color: #0369a1 !important;
+  border-color: rgba(14, 165, 233, 0.35) !important;
+}
+
+html.light .badge-purple {
+  background-color: rgba(168, 85, 247, 0.12) !important;
+  color: #7e22ce !important;
+  border-color: rgba(168, 85, 247, 0.35) !important;
+}
+
+html.light .badge-red {
+  background-color: rgba(244, 63, 94, 0.12) !important;
+  color: #be123c !important;
+  border-color: rgba(244, 63, 94, 0.35) !important;
+}
+
+/* Light Mode Table Elements */
+html.light th {
+  background-color: #f8fafc !important;
+  color: #475569 !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light td {
+  border-color: #e2e8f0 !important;
+  color: #1e293b !important;
+}
+
+html.light tbody tr:hover {
+  background-color: #f8fafc !important;
+}
+
+/* Light Mode Modals & Dropdown Popovers */
+html.light .fixed.inset-0.bg-black\/75,
+html.light .fixed.inset-0.bg-black\/80,
+html.light .fixed.inset-0.bg-slate-950\/80,
+html.light .fixed.inset-0.bg-slate-950\/85 {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+  backdrop-filter: blur(6px) !important;
+}
+
+/* Light Mode Scrollbars */
+html.light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 /* ==========================================================================
@@ -135,6 +402,12 @@
     break-inside: avoid !important;
   }
 
+  /* When J-Form receipt modal is active during print, hide printable pass card and background panels */
+  body:has(.printable-jform-modal-overlay) .printable-pass-card,
+  body:has(.printable-jform-modal-overlay) .glass-panel {
+    display: none !important;
+  }
+
   /* Printable e-J-Form document styling for paper */
   .printable-jform-modal-overlay {
     position: static !important;
@@ -165,4 +438,3 @@
     break-inside: avoid !important;
   }
 }
-

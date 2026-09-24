@@ -165,7 +165,16 @@ router.post('/book', authenticateToken, async (req, res) => {
       estimated_quantity_quintals,
       vehicle_type,
       vehicle_number,
+      bag_count,
     } = req.body;
+
+    let safeBagCount = null;
+    if (bag_count !== undefined && bag_count !== null && bag_count !== '') {
+      const parsedBags = parseInt(bag_count, 10);
+      if (Number.isFinite(parsedBags) && parsedBags > 0) {
+        safeBagCount = parsedBags;
+      }
+    }
 
     if (!centre_id || !slot_id || !crop_name || !estimated_quantity_quintals || !vehicle_number) {
       return res.status(400).json({
@@ -238,6 +247,7 @@ router.post('/book', authenticateToken, async (req, res) => {
       crop_name,
       crop_variety: crop_variety || 'Standard FAQ',
       estimated_quantity_quintals: estQty,
+      bag_count: safeBagCount,
       vehicle_type: vehicle_type || 'Tractor Trolley',
       vehicle_number: vehicle_number.toUpperCase().trim(),
       status: 'BOOKED',
@@ -252,15 +262,28 @@ router.post('/book', authenticateToken, async (req, res) => {
       try {
         await client.query('BEGIN');
 
-        await client.query(
-          `INSERT INTO bookings (id, token_number, farmer_id, centre_id, slot_id, crop_name, crop_variety, estimated_quantity_quintals, vehicle_type, vehicle_number, status, current_station, qr_code_hash, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-          [newBooking.id, newBooking.token_number, newBooking.farmer_id, newBooking.centre_id, newBooking.slot_id, newBooking.crop_name, newBooking.crop_variety, newBooking.estimated_quantity_quintals, newBooking.vehicle_type, newBooking.vehicle_number, newBooking.status, newBooking.current_station, newBooking.qr_code_hash, newBooking.created_at]
-        );
+        try {
+          await client.query(
+            `INSERT INTO bookings (id, token_number, farmer_id, centre_id, slot_id, crop_name, crop_variety, estimated_quantity_quintals, vehicle_type, vehicle_number, status, current_station, qr_code_hash, created_at, bag_count)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+            [newBooking.id, newBooking.token_number, newBooking.farmer_id, newBooking.centre_id, newBooking.slot_id, newBooking.crop_name, newBooking.crop_variety, newBooking.estimated_quantity_quintals, newBooking.vehicle_type, newBooking.vehicle_number, newBooking.status, newBooking.current_station, newBooking.qr_code_hash, newBooking.created_at, newBooking.bag_count]
+          );
+        } catch (insertErr) {
+          if (insertErr.message && insertErr.message.includes('bag_count')) {
+            // Unmigrated table fallback
+            await client.query(
+              `INSERT INTO bookings (id, token_number, farmer_id, centre_id, slot_id, crop_name, crop_variety, estimated_quantity_quintals, vehicle_type, vehicle_number, status, current_station, qr_code_hash, created_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+              [newBooking.id, newBooking.token_number, newBooking.farmer_id, newBooking.centre_id, newBooking.slot_id, newBooking.crop_name, newBooking.crop_variety, newBooking.estimated_quantity_quintals, newBooking.vehicle_type, newBooking.vehicle_number, newBooking.status, newBooking.current_station, newBooking.qr_code_hash, newBooking.created_at]
+            );
+          } else {
+            throw insertErr;
+          }
+        }
 
         await client.query(
-          `UPDATE slots 
-           SET booked_tokens = booked_tokens + 1, booked_capacity_quintals = booked_capacity_quintals + $1 
+          `UPDATE slots
+           SET booked_tokens = booked_tokens + 1, booked_capacity_quintals = booked_capacity_quintals + $1
            WHERE id = $2`,
           [estQty, slot_id]
         );
@@ -341,7 +364,7 @@ router.get('/my', authenticateToken, async (req, res) => {
 
     if (!isUsingMockStore && pool) {
       const dbRes = await pool.query(
-        `SELECT 
+        `SELECT
            b.*,
            c.name as centre_name,
            c.address as centre_address,
@@ -409,7 +432,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     if (!isUsingMockStore && pool) {
       const dbRes = await pool.query(
-        `SELECT 
+        `SELECT
            b.*,
            u.full_name as farmer_name,
            u.phone as farmer_phone,
@@ -447,9 +470,9 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
       // Calculate queue position ahead
       const aheadRes = await pool.query(
-        `SELECT COUNT(*) as count FROM bookings 
-         WHERE centre_id = $1 
-           AND status IN ('CHECKED_IN', 'CALLED', 'QUALITY_INSPECTION') 
+        `SELECT COUNT(*) as count FROM bookings
+         WHERE centre_id = $1
+           AND status IN ('CHECKED_IN', 'CALLED', 'QUALITY_INSPECTION')
            AND created_at < $2`,
         [b.centre_id, b.created_at]
       );
@@ -584,6 +607,240 @@ router.post('/:id/cancel', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Cancel Booking Error:', error);
     return res.status(500).json({ success: false, message: 'Failed to cancel booking.' });
+  }
+});
+
+// POST /api/bookings/:id/reschedule - Reschedule an upcoming booking to another available slot
+router.post('/:id/reschedule', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { new_slot_id } = req.body;
+
+    if (!new_slot_id) {
+      return res.status(400).json({ success: false, message: 'new_slot_id is required.' });
+    }
+
+    let b = null;
+    let oldSlot = null;
+    let newSlot = null;
+    let centre = null;
+
+    if (!isUsingMockStore && pool) {
+      const bRes = await pool.query('SELECT * FROM bookings WHERE id = $1 OR token_number = $1', [id]);
+      if (bRes.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Booking not found.' });
+      }
+      b = bRes.rows[0];
+
+      // Enforce ownership: owner or staff/admin
+      const isStaffOrAdmin = ['admin', 'centre_officer', 'quality_inspector', 'weighbridge_operator'].includes(req.user.role);
+      if (!isStaffOrAdmin && b.farmer_id !== req.user.id) {
+        return res.status(403).json({ success: false, message: 'Forbidden: You can only reschedule your own booking.' });
+      }
+
+      if (b.status !== 'BOOKED') {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot reschedule a booking in "${b.status}" status. Only upcoming scheduled bookings (status: BOOKED) can be rescheduled.`,
+        });
+      }
+
+      if (b.slot_id === new_slot_id) {
+        return res.status(400).json({
+          success: false,
+          message: 'The selected replacement slot is identical to your current slot. Please select a different time slot.',
+        });
+      }
+
+      // Check new slot exists and has capacity
+      const newSlotRes = await pool.query('SELECT * FROM slots WHERE id = $1', [new_slot_id]);
+      if (newSlotRes.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Selected replacement slot does not exist.' });
+      }
+      newSlot = newSlotRes.rows[0];
+
+      // Check active centre
+      const cRes = await pool.query('SELECT * FROM centres WHERE id = $1', [newSlot.centre_id]);
+      if (cRes.rows.length > 0) centre = cRes.rows[0];
+      if (centre && centre.is_active === false) {
+        return res.status(400).json({ success: false, message: 'The procurement centre for this slot is currently inactive.' });
+      }
+
+      // Slot date check
+      if (isSlotPassed(newSlot.slot_date, newSlot.end_time)) {
+        return res.status(400).json({
+          success: false,
+          message: 'This time slot has already passed. Please select an upcoming or future time slot.',
+        });
+      }
+
+      // Slot status
+      if (newSlot.status !== 'OPEN') {
+        return res.status(400).json({ success: false, message: 'Selected time slot is currently closed or paused.' });
+      }
+
+      // Token capacity check
+      const bookedTokens = parseInt(newSlot.booked_tokens || 0, 10);
+      const maxTokens = parseInt(newSlot.max_tokens || 25, 10);
+      if (bookedTokens >= maxTokens) {
+        return res.status(400).json({ success: false, message: 'Selected replacement slot is fully booked. Please choose another slot.' });
+      }
+
+      // Weight capacity check
+      const qty = parseFloat(b.estimated_quantity_quintals || 0);
+      const maxCap = parseFloat(newSlot.max_capacity_quintals || 1500);
+      const bookedCap = parseFloat(newSlot.booked_capacity_quintals || 0);
+      if (bookedCap + qty > maxCap) {
+        return res.status(400).json({ success: false, message: 'Selected slot does not have sufficient weight capacity for this consignment.' });
+      }
+
+      // Execute atomic swap in transaction
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        // 1. Release old slot capacity
+        await client.query(
+          `UPDATE slots
+           SET booked_tokens = GREATEST(0, booked_tokens - 1),
+               booked_capacity_quintals = GREATEST(0, booked_capacity_quintals - $1)
+           WHERE id = $2`,
+          [qty, b.slot_id]
+        );
+
+        // 2. Reserve new slot capacity
+        await client.query(
+          `UPDATE slots
+           SET booked_tokens = booked_tokens + 1,
+               booked_capacity_quintals = booked_capacity_quintals + $1
+           WHERE id = $2`,
+          [qty, new_slot_id]
+        );
+
+        // 3. Update booking reference (preserving token_number, id, qr_code_hash)
+        const updateRes = await client.query(
+          `UPDATE bookings
+           SET slot_id = $1, centre_id = $2
+           WHERE id = $3
+           RETURNING *`,
+          [new_slot_id, newSlot.centre_id, b.id]
+        );
+        b = updateRes.rows[0];
+
+        // 4. Audit log
+        await client.query(
+          `INSERT INTO queue_audit_logs (id, booking_id, from_status, to_status, station, timestamp, notes)
+           VALUES ($1, $2, 'BOOKED', 'BOOKED', 'SLOT_RESCHEDULED', $3, $4)`,
+          [`log_${Date.now()}`, b.id, new Date().toISOString(), `Rescheduled from old slot to ${new_slot_id}`]
+        );
+
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+    } else {
+      b = inMemoryStore.bookings.find(x => x.id === id || x.token_number === id);
+      if (!b) {
+        return res.status(404).json({ success: false, message: 'Booking not found.' });
+      }
+
+      const isStaffOrAdmin = ['admin', 'centre_officer', 'quality_inspector', 'weighbridge_operator'].includes(req.user.role);
+      if (!isStaffOrAdmin && b.farmer_id !== req.user.id) {
+        return res.status(403).json({ success: false, message: 'Forbidden: You can only reschedule your own booking.' });
+      }
+
+      if (b.status !== 'BOOKED') {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot reschedule a booking in "${b.status}" status. Only upcoming scheduled bookings (status: BOOKED) can be rescheduled.`,
+        });
+      }
+
+      if (b.slot_id === new_slot_id) {
+        return res.status(400).json({
+          success: false,
+          message: 'The selected replacement slot is identical to your current slot. Please select a different time slot.',
+        });
+      }
+
+      newSlot = inMemoryStore.slots.find(s => s.id === new_slot_id);
+      if (!newSlot) {
+        return res.status(404).json({ success: false, message: 'Selected replacement slot does not exist.' });
+      }
+
+      centre = inMemoryStore.centres.find(c => c.id === newSlot.centre_id);
+      if (centre && centre.is_active === false) {
+        return res.status(400).json({ success: false, message: 'The procurement centre for this slot is currently inactive.' });
+      }
+
+      if (isSlotPassed(newSlot.slot_date, newSlot.end_time)) {
+        return res.status(400).json({
+          success: false,
+          message: 'This time slot has already passed. Please select an upcoming or future time slot.',
+        });
+      }
+
+      if (newSlot.status !== 'OPEN') {
+        return res.status(400).json({ success: false, message: 'Selected time slot is currently closed or paused.' });
+      }
+
+      const bookedTokens = parseInt(newSlot.booked_tokens || 0, 10);
+      const maxTokens = parseInt(newSlot.max_tokens || 25, 10);
+      if (bookedTokens >= maxTokens) {
+        return res.status(400).json({ success: false, message: 'Selected replacement slot is fully booked. Please choose another slot.' });
+      }
+
+      const qty = parseFloat(b.estimated_quantity_quintals || 0);
+      const maxCap = parseFloat(newSlot.max_capacity_quintals || 1500);
+      const bookedCap = parseFloat(newSlot.booked_capacity_quintals || 0);
+      if (bookedCap + qty > maxCap) {
+        return res.status(400).json({ success: false, message: 'Selected slot does not have sufficient weight capacity for this consignment.' });
+      }
+
+      // Atomic memory update
+      oldSlot = inMemoryStore.slots.find(s => s.id === b.slot_id);
+      if (oldSlot && oldSlot.booked_tokens > 0) {
+        oldSlot.booked_tokens = Math.max(0, oldSlot.booked_tokens - 1);
+        oldSlot.booked_capacity_quintals = Math.max(0, (oldSlot.booked_capacity_quintals || 0) - qty);
+      }
+
+      newSlot.booked_tokens = (newSlot.booked_tokens || 0) + 1;
+      newSlot.booked_capacity_quintals = (newSlot.booked_capacity_quintals || 0) + qty;
+
+      b.slot_id = new_slot_id;
+      b.centre_id = newSlot.centre_id;
+
+      inMemoryStore.queue_audit_logs.push({
+        id: `log_${Date.now()}`,
+        booking_id: b.id,
+        from_status: 'BOOKED',
+        to_status: 'BOOKED',
+        station: 'SLOT_RESCHEDULED',
+        timestamp: new Date().toISOString(),
+        notes: `Rescheduled from old slot to ${new_slot_id}`,
+      });
+    }
+
+    // Broadcast queue update for real-time screens
+    broadcastQueueUpdate(b.centre_id);
+
+    return res.json({
+      success: true,
+      message: 'Procurement slot rescheduled successfully!',
+      booking: b,
+      rescheduled_slot: {
+        id: newSlot.id,
+        slot_date: newSlot.slot_date,
+        start_time: newSlot.start_time,
+        end_time: newSlot.end_time,
+      },
+    });
+  } catch (error) {
+    console.error('Reschedule Booking Error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to reschedule booking. Please try again.' });
   }
 });
 

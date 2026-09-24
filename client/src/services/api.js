@@ -41,6 +41,7 @@ export const slotsAPI = {
   getMyBookings: () => api.get('/slots/my'),
   getBookingPass: (id) => api.get(`/slots/${id}`),
   cancelBooking: (id) => api.post(`/slots/${id}/cancel`),
+  rescheduleBooking: (id, data) => api.post(`/slots/${id}/reschedule`, data),
 };
 
 export const queueAPI = {

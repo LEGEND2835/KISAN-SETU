@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
+import { ThemeProvider } from './context/ThemeContext';
 
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
@@ -90,12 +91,14 @@ function AppLayout() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <LanguageProvider>
-        <Router>
-          <AppLayout />
-        </Router>
-      </LanguageProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <LanguageProvider>
+          <Router>
+            <AppLayout />
+          </Router>
+        </LanguageProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

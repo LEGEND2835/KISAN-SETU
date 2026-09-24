@@ -15,21 +15,30 @@ import {
   Layers,
   ChevronRight,
   ShieldAlert,
-  Loader2
+  Loader2,
+  IndianRupee
 } from 'lucide-react';
 import { centresAPI, slotsAPI, aiAPI } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { getCropName } from '../../utils/cropsData';
 
+import wheatImg from '../../assets/crops/Wheat.jpeg';
+import paddyBasmatiImg from '../../assets/crops/Paddy(Basmati).jpeg';
+import paddyPrImg from '../../assets/crops/Paddy(PR).jpeg';
+import mustardImg from '../../assets/crops/Mustrard.jpg';
+import gramImg from '../../assets/crops/Channa.jpg';
+import maizeImg from '../../assets/crops/Maize.jpeg';
+import soybeanImg from '../../assets/crops/Soybean.jpeg';
+
 const CROPS = [
-  { key: 'wheat', name: 'Wheat', variety: 'HD-2967 (Grade A)', msp: '₹2,275/Qtl', icon: '🌾' },
-  { key: 'paddy_basmati', name: 'Paddy (Basmati)', variety: 'Pusa 1121', msp: '₹4,200/Qtl', icon: '🌾' },
-  { key: 'paddy_pr', name: 'Paddy (PR)', variety: 'PR-126', msp: '₹2,183/Qtl', icon: '🌾' },
-  { key: 'mustard', name: 'Mustard', variety: 'Pusa Bold', msp: '₹5,650/Qtl', icon: '🌱' },
-  { key: 'gram', name: 'Gram', variety: 'Kabuli/Desi', msp: '₹5,440/Qtl', icon: '🌿' },
-  { key: 'maize', name: 'Maize', variety: 'Hybrid Yellow', msp: '₹2,090/Qtl', icon: '🌽' },
-  { key: 'soybean', name: 'Soybean', variety: 'JS-335', msp: '₹4,600/Qtl', icon: '🌱' },
+  { key: 'wheat', name: 'Wheat', variety: 'HD-2967 (Grade A)', msp: '₹2,275/Qtl', image: wheatImg },
+  { key: 'paddy_basmati', name: 'Paddy (Basmati)', variety: 'Pusa 1121', msp: '₹4,200/Qtl', image: paddyBasmatiImg },
+  { key: 'paddy_pr', name: 'Paddy (PR)', variety: 'PR-126', msp: '₹2,183/Qtl', image: paddyPrImg },
+  { key: 'mustard', name: 'Mustard', variety: 'Pusa Bold', msp: '₹5,650/Qtl', image: mustardImg },
+  { key: 'gram', name: 'Gram', variety: 'Kabuli/Desi', msp: '₹5,440/Qtl', image: gramImg },
+  { key: 'maize', name: 'Maize', variety: 'Hybrid Yellow', msp: '₹2,090/Qtl', image: maizeImg },
+  { key: 'soybean', name: 'Soybean', variety: 'JS-335', msp: '₹4,600/Qtl', image: soybeanImg },
 ];
 
 const VEHICLES = [
@@ -54,6 +63,7 @@ export default function BookSlot() {
   const [cropName, setCropName] = useState('Wheat');
   const [cropVariety, setCropVariety] = useState('HD-2967 (Grade A)');
   const [estimatedQuantity, setEstimatedQuantity] = useState('60');
+  const [bagCount, setBagCount] = useState('120');
   const [vehicleType, setVehicleType] = useState('Tractor Trolley');
   const [vehicleNumber, setVehicleNumber] = useState('HR-05-AB-1234');
 
@@ -103,6 +113,7 @@ export default function BookSlot() {
             crop_name: cropName,
             quantity_quintals: parseFloat(estimatedQuantity),
             preferred_date: slotDate,
+            vehicle_type: vehicleType,
           });
           if (res.data.success) {
             setAiRecommendations(res.data.recommendations);
@@ -115,7 +126,7 @@ export default function BookSlot() {
       }
       fetchAiRecs();
     }
-  }, [step, cropName, estimatedQuantity, slotDate]);
+  }, [step, cropName, estimatedQuantity, slotDate, vehicleType]);
 
   // Fetch available slots when reaching Step 3 or changing date/centre
   useEffect(() => {
@@ -164,6 +175,13 @@ export default function BookSlot() {
       setErrorMsg('Please enter a valid estimated quantity in quintals.');
       return;
     }
+    if (bagCount) {
+      const bags = parseInt(bagCount, 10);
+      if (isNaN(bags) || bags <= 0) {
+        setErrorMsg('Please enter a valid number of bags or leave it empty.');
+        return;
+      }
+    }
     const selectedV = VEHICLES.find(v => v.type === vehicleType);
     if (!selectedV || qty > selectedV.maxCap) {
       setErrorMsg(`Selected vehicle (${vehicleType}) cannot carry ${qty} Qtl. Maximum capacity is ${selectedV?.maxCap || 0} Qtl. Please select a suitable vehicle.`);
@@ -202,6 +220,7 @@ export default function BookSlot() {
         crop_name: cropName,
         crop_variety: cropVariety,
         estimated_quantity_quintals: parseFloat(estimatedQuantity),
+        bag_count: bagCount ? parseInt(bagCount, 10) : null,
         vehicle_type: vehicleType,
         vehicle_number: vehicleNumber.toUpperCase().trim(),
       });
@@ -228,6 +247,7 @@ export default function BookSlot() {
   };
 
   const selectedCentreObj = centres.find(c => c.id === selectedCentreId);
+  const selectedAiRec = aiRecommendations.find(r => r.centre_id === selectedCentreId);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
@@ -302,22 +322,28 @@ export default function BookSlot() {
                         setCropName(c.name);
                         setCropVariety(c.variety);
                       }}
-                      className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all ${
+                      className={`p-3 rounded-xl border text-left flex items-center justify-between gap-2.5 transition-all ${
                         cropName === c.name
                           ? 'bg-kisan-600/20 border-kisan-500 text-white shadow-md'
                           : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700'
                       }`}
                     >
-                      <span className="text-2xl mb-1">{c.icon}</span>
-                      <span className="font-bold text-sm text-white">{localizedName}</span>
-                      <span className="text-[11px] text-emerald-400 font-semibold">{c.msp}</span>
+                      <div className="flex-1 min-w-0 pr-1">
+                        <div className="font-bold text-sm text-white leading-tight">{localizedName}</div>
+                        <div className="text-[11px] sm:text-xs text-emerald-400 font-semibold mt-1">{c.msp}</div>
+                      </div>
+                      <img
+                        src={c.image}
+                        alt={`${c.name} crop`}
+                        className="w-16 h-16 sm:w-[68px] sm:h-[68px] object-cover rounded-lg flex-shrink-0 shadow-sm border border-slate-700/40"
+                      />
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Estimated Quantity Input */}
+            {/* Estimated Quantity & Number of Bags Input */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
@@ -327,7 +353,14 @@ export default function BookSlot() {
                   <input
                     type="number"
                     value={estimatedQuantity}
-                    onChange={(e) => setEstimatedQuantity(e.target.value)}
+                    onChange={(e) => {
+                      const newQty = e.target.value;
+                      setEstimatedQuantity(newQty);
+                      const q = parseFloat(newQty);
+                      if (q > 0) {
+                        setBagCount(String(Math.round(q * 2)));
+                      }
+                    }}
                     placeholder="e.g. 50"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-base font-semibold focus:outline-none focus:border-kisan-500"
                     required
@@ -339,18 +372,46 @@ export default function BookSlot() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                  Vehicle Registration Number
-                </label>
-                <input
-                  type="text"
-                  value={vehicleNumber}
-                  onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
-                  placeholder="e.g. HR-05-AB-1234"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-base font-mono uppercase focus:outline-none focus:border-kisan-500"
-                  required
-                />
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    Number of Bags (बोरी)
+                  </label>
+                  <span className="text-[10px] text-amber-400/90 font-medium">
+                    * Indicative Estimate
+                  </span>
+                </div>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    value={bagCount}
+                    onChange={(e) => setBagCount(e.target.value)}
+                    placeholder="e.g. 120"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-base font-semibold focus:outline-none focus:border-kisan-500"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 uppercase">
+                    Bags
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  * Indicative calculation (~2 bags/Qtl approx. Packing weights vary; not an official Mandi standard).
+                </p>
               </div>
+            </div>
+
+            {/* Vehicle Registration Number */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                Vehicle Registration Number
+              </label>
+              <input
+                type="text"
+                value={vehicleNumber}
+                onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
+                placeholder="e.g. HR-05-AB-1234"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-base font-mono uppercase focus:outline-none focus:border-kisan-500"
+                required
+              />
             </div>
 
             {/* Vehicle Type Selection */}
@@ -465,16 +526,77 @@ export default function BookSlot() {
                       {c.district}, {c.state}
                     </p>
 
-                    <div className="mt-4 pt-3 border-t border-slate-800 grid grid-cols-2 gap-2 text-xs">
+                    {/* Operational Turnaround Summary */}
+                    <div className="mt-3 pt-3 border-t border-slate-800 grid grid-cols-2 gap-2 text-xs">
                       <div>
                         <span className="text-slate-500 block text-[11px]">Current Queue:</span>
-                        <span className="font-bold text-white">{c.active_in_queue_count} Trucks</span>
+                        <span className="font-bold text-white">
+                          {aiRec?.active_trucks_in_queue ?? c.active_in_queue_count ?? 0} Trucks
+                        </span>
                       </div>
                       <div>
-                        <span className="text-slate-500 block text-[11px]">Est. Processing:</span>
-                        <span className="font-bold text-amber-400">~{c.avg_wait_minutes} mins</span>
+                        <span className="text-slate-500 block text-[11px]">Est. Turnaround:</span>
+                        <span className="font-bold text-amber-400">
+                          {aiRec?.estimated_total_minutes !== undefined
+                            ? `~${aiRec.estimated_total_minutes} mins`
+                            : `~${c.avg_wait_minutes || 20} mins`}
+                        </span>
                       </div>
                     </div>
+
+                    {/* Cost & Time Matrix Breakdown */}
+                    {aiRec && (aiRec.estimated_total_minutes !== undefined || aiRec.estimated_cost !== undefined) && (
+                      <div className="mt-3 pt-2.5 border-t border-slate-800/80 space-y-2 text-[11px]">
+                        {/* Time Matrix Breakdown */}
+                        {aiRec.estimated_total_minutes !== undefined && (
+                          <div className="bg-slate-900/80 rounded-lg p-2.5 border border-slate-800 space-y-1">
+                            <div className="flex items-center justify-between text-slate-400 font-medium">
+                              <span className="flex items-center gap-1.5 text-[11px]">
+                                <Clock className="w-3.5 h-3.5 text-sky-400" /> Time Matrix:
+                              </span>
+                              <span className="font-bold text-sky-300">
+                                ~{aiRec.estimated_total_minutes} min total
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+                              <span>Queue Wait: <strong className="text-slate-200">~{aiRec.estimated_wait_minutes ?? 0}m</strong></span>
+                              <span className="text-slate-600">•</span>
+                              <span>Handling: <strong className="text-slate-200">~{aiRec.estimated_processing_minutes ?? 0}m</strong></span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Cost Matrix Breakdown */}
+                        {aiRec.estimated_cost !== undefined && (
+                          <div className="bg-slate-900/80 rounded-lg p-2.5 border border-slate-800 space-y-1">
+                            <div className="flex items-center justify-between text-slate-400 font-medium">
+                              <span className="flex items-center gap-1.5 text-[11px]">
+                                <IndianRupee className="w-3.5 h-3.5 text-emerald-400" /> Cost Matrix:
+                              </span>
+                              <span className="font-bold text-emerald-400">
+                                ₹{Number(aiRec.estimated_cost).toLocaleString('en-IN')} total
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+                              <span>Transport: <strong className="text-slate-200">₹{Number(aiRec.estimated_transport_cost ?? 0).toLocaleString('en-IN')}</strong></span>
+                              <span className="text-slate-600">•</span>
+                              <span>Mandi Fee: <strong className="text-slate-200">₹{Number(aiRec.estimated_mandi_cost ?? 0).toLocaleString('en-IN')}</strong></span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Explainable AI Justification */}
+                        {aiRec.ai_explanation && (
+                          <p className="text-[10px] text-amber-300/90 bg-amber-500/10 rounded-md p-1.5 border border-amber-500/20 leading-relaxed">
+                            💡 {aiRec.ai_explanation}
+                          </p>
+                        )}
+
+                        <div className="text-[9px] text-slate-500 italic text-right">
+                          *Indicative estimates based on {vehicleType} haulage
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -612,8 +734,8 @@ export default function BookSlot() {
             <h4 className="font-bold text-white uppercase tracking-wider text-[11px]">Booking Summary</h4>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-slate-300">
               <div>
-                <span className="text-slate-500 block text-[10px]">Crop:</span>
-                <span className="font-semibold">{cropName} ({estimatedQuantity} Qtl)</span>
+                <span className="text-slate-500 block text-[10px]">Crop & Bags:</span>
+                <span className="font-semibold">{cropName} ({estimatedQuantity} Qtl {bagCount ? `• ~${bagCount} bags*` : ''})</span>
               </div>
               <div>
                 <span className="text-slate-500 block text-[10px]">Vehicle:</span>
@@ -628,6 +750,24 @@ export default function BookSlot() {
                 <span className="font-semibold">{slotDate}</span>
               </div>
             </div>
+
+            {selectedAiRec && (selectedAiRec.estimated_total_minutes !== undefined || selectedAiRec.estimated_cost !== undefined) && (
+              <div className="pt-2 mt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                {selectedAiRec.estimated_total_minutes !== undefined && (
+                  <span className="text-slate-400">
+                    Est. Turnaround: <strong className="text-amber-400">~{selectedAiRec.estimated_total_minutes} mins</strong>
+                  </span>
+                )}
+                {selectedAiRec.estimated_cost !== undefined && (
+                  <span className="text-slate-400">
+                    Est. Logistics Cost: <strong className="text-emerald-400">₹{Number(selectedAiRec.estimated_cost).toLocaleString('en-IN')}</strong>
+                  </span>
+                )}
+                <span className="text-[10px] text-slate-500 italic ml-auto">
+                  *Indicative estimate
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="pt-4 border-t border-slate-800 flex items-center justify-between">

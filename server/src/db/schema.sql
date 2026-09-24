@@ -76,12 +76,14 @@ CREATE TABLE IF NOT EXISTS bookings (
     completion_time TIMESTAMP WITH TIME ZONE,
     rejection_stage VARCHAR(60), -- 'QUALITY_INSPECTION', 'WEIGHBRIDGE', 'GATE'
     rejection_reason TEXT,
+    bag_count INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Ensure columns exist in existing PostgreSQL databases (Backward-compatible non-destructive migrations)
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS rejection_stage VARCHAR(60);
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS bag_count INTEGER;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS dob VARCHAR(30);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS crops JSONB DEFAULT '[]';
